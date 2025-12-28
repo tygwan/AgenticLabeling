@@ -184,19 +184,111 @@ async def list_available_metrics():
             "recall",
             "f1_score",
             "confusion_matrix",
+            "per_class_ap",
         ],
         "classification": [
             "accuracy",
-            "precision",
-            "recall",
-            "f1_score",
+            "macro_precision",
+            "macro_recall",
+            "macro_f1",
             "confusion_matrix",
-            "per_class_accuracy",
+            "per_class_metrics",
         ],
         "segmentation": [
             "mIoU",
             "pixel_accuracy",
             "dice_coefficient",
-            "boundary_f1",
         ],
     }
+
+
+@app.post("/evaluate/detection/coco")
+async def evaluate_detection_coco(
+    predictions: str = Form(...),
+    ground_truth: str = Form(...),
+):
+    """Evaluate detection with COCO-style mAP50-95.
+
+    Calculates mAP at multiple IoU thresholds (0.5 to 0.95).
+    """
+    try:
+        preds = json.loads(predictions)
+        gt = json.loads(ground_truth)
+
+        metrics = evaluator.calculate_map_at_thresholds(preds, gt)
+
+        return EvaluationResponse(
+            success=True,
+            metrics=metrics,
+            message="COCO-style evaluation completed",
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+@app.get("/evaluations/{evaluation_id}")
+async def get_evaluation(evaluation_id: str):
+    """Get stored evaluation by ID."""
+    result = evaluator.get_evaluation(evaluation_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+    return {"success": True, "evaluation": result}
+
+
+@app.get("/evaluations/{evaluation_id}/report")
+async def get_evaluation_report(
+    evaluation_id: str,
+    format: str = "json",
+    include_visualizations: bool = False,
+):
+    """Get evaluation report."""
+    report = evaluator.generate_report(evaluation_id, format, include_visualizations)
+    if "error" in report:
+        raise HTTPException(status_code=404, detail=report["error"])
+    return {"success": True, "report": report}
+
+
+@app.post("/evaluate/batch")
+async def evaluate_batch(
+    predictions: str = Form(...),
+    ground_truth: str = Form(...),
+    task: str = Form("detection"),
+    iou_threshold: float = Form(0.5),
+):
+    """Evaluate a batch of predictions.
+
+    Args:
+        predictions: JSON array of predictions per image
+        ground_truth: JSON array of ground truth per image
+        task: "detection", "classification", or "segmentation"
+        iou_threshold: IoU threshold for detection (ignored for other tasks)
+    """
+    try:
+        preds = json.loads(predictions)
+        gt = json.loads(ground_truth)
+
+        if task == "detection":
+            metrics = evaluator.evaluate_detection(preds, gt, iou_threshold)
+        elif task == "classification":
+            metrics = evaluator.evaluate_classification(preds, gt)
+        elif task == "segmentation":
+            metrics = evaluator.evaluate_segmentation(preds, gt)
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": f"Unknown task: {task}"},
+            )
+
+        return EvaluationResponse(
+            success=True,
+            metrics=metrics,
+            message=f"{task} batch evaluation completed",
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )

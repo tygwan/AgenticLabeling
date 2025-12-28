@@ -11,8 +11,12 @@ services:
       - CLASSIFICATION_URL=http://classification-agent:8003
       - LABELING_URL=http://labeling-agent:8004
       - TRAINING_URL=http://training-agent:8005
+      - REGISTRY_URL=http://object-registry:8010
+      - DATA_MANAGER_URL=http://data-manager:8006
     depends_on:
       - redis
+      - object-registry
+      - data-manager
     networks:
       - internal
 
@@ -112,6 +116,12 @@ services:
     environment:
       - PYTHONPATH=/packages
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DATA_MANAGER_URL=http://data-manager:8006
+      - REGISTRY_URL=http://object-registry:8010
+    depends_on:
+      - data-manager
+      - object-registry
+      - mlflow
     networks:
       - internal
 
@@ -121,6 +131,22 @@ services:
       - "8006:8000"
     volumes:
       - ./data:/data
+    environment:
+      - DATA_DIR=/data
+      - REGISTRY_URL=http://object-registry:8010
+    depends_on:
+      - object-registry
+    networks:
+      - internal
+
+  object-registry:
+    build: ./services/object-registry
+    ports:
+      - "8010:8000"
+    volumes:
+      - ./data/registry:/data
+    environment:
+      - DATA_DIR=/data
     networks:
       - internal
 
@@ -143,6 +169,35 @@ services:
       - model-cache:/root/.cache
     environment:
       - PYTHONPATH=/packages
+    networks:
+      - internal
+
+  label-studio-lite:
+    build: ./services/label-studio-lite
+    ports:
+      - "8501:8501"
+    environment:
+      - REGISTRY_URL=http://object-registry:8010
+      - GATEWAY_URL=http://gateway:8000
+    depends_on:
+      - object-registry
+      - gateway
+    networks:
+      - internal
+
+  preprocessing-agent:
+    build: ./services/preprocessing-agent
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./data:/data
+    environment:
+      - GATEWAY_URL=http://gateway:8000
+      - REGISTRY_URL=http://object-registry:8010
+      - DATA_DIR=/data/preprocessing
+    depends_on:
+      - gateway
+      - object-registry
     networks:
       - internal
 

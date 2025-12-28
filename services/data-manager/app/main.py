@@ -5,15 +5,14 @@ import os
 import shutil
 import zipfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 from .dataset import DatasetManager
-from .schemas import DatasetInfo, DatasetResponse
-
-import os
+from .exporters import YOLOExporter, COCOExporter
 
 app = FastAPI(
     title="Data Manager",
@@ -23,7 +22,21 @@ app = FastAPI(
 
 # Use env var for Docker, default for local testing
 DATA_DIR = os.getenv("DATA_DIR", os.path.expanduser("~/dev/AgenticLabeling/data"))
+REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8010")
+EXPORT_DIR = os.path.join(DATA_DIR, "exports")
+
 dataset_manager = DatasetManager(data_dir=DATA_DIR)
+
+
+# ==================== Schemas ====================
+
+class ExportRequest(BaseModel):
+    """Request schema for dataset export."""
+    dataset_name: str
+    format: str = "yolo"  # "yolo" or "coco"
+    filter_config: Optional[Dict[str, Any]] = None
+    split_config: Optional[Dict[str, float]] = None
+    include_masks: bool = False
 
 
 @app.get("/health")
@@ -234,6 +247,96 @@ async def augment_dataset(
             "message": f"Generated {result['generated']} augmented images",
             "data": result,
         }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+# ==================== Registry Export Endpoints ====================
+
+@app.post("/registry/export")
+async def export_from_registry(request: ExportRequest):
+    """Export dataset from Object Registry to YOLO or COCO format.
+
+    This endpoint fetches objects from the Object Registry and exports them
+    to the specified format (YOLO or COCO).
+
+    Args:
+        request: Export configuration including dataset name, format, filters, and split ratios
+
+    Returns:
+        Export result with paths and statistics
+    """
+    try:
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+
+        if request.format.lower() == "yolo":
+            exporter = YOLOExporter(REGISTRY_URL, EXPORT_DIR)
+        elif request.format.lower() == "coco":
+            exporter = COCOExporter(REGISTRY_URL, EXPORT_DIR)
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": f"Unsupported format: {request.format}"},
+            )
+
+        result = await exporter.export_dataset(
+            dataset_name=request.dataset_name,
+            filter_config=request.filter_config,
+            split_config=request.split_config,
+            include_masks=request.include_masks,
+        )
+
+        return {"success": True, "data": result}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+@app.get("/registry/export/{dataset_name}/download")
+async def download_exported_dataset(dataset_name: str, format: str = "yolo"):
+    """Download exported dataset as zip file.
+
+    Args:
+        dataset_name: Name of the exported dataset
+        format: Export format (yolo or coco)
+
+    Returns:
+        Zip file of the exported dataset
+    """
+    zip_path = Path(EXPORT_DIR) / f"{dataset_name}.zip"
+
+    if not zip_path.exists():
+        raise HTTPException(status_code=404, detail="Exported dataset not found")
+
+    return FileResponse(
+        zip_path,
+        media_type="application/zip",
+        filename=f"{dataset_name}_{format}.zip",
+    )
+
+
+@app.get("/registry/exports")
+async def list_exports():
+    """List all exported datasets."""
+    try:
+        export_path = Path(EXPORT_DIR)
+        if not export_path.exists():
+            return {"success": True, "exports": []}
+
+        exports = []
+        for zip_file in export_path.glob("*.zip"):
+            exports.append({
+                "name": zip_file.stem,
+                "path": str(zip_file),
+                "size_mb": round(zip_file.stat().st_size / (1024 * 1024), 2),
+            })
+
+        return {"success": True, "exports": exports}
     except Exception as e:
         return JSONResponse(
             status_code=500,

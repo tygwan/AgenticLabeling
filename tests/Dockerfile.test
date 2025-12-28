@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install test dependencies
+RUN pip install pytest pytest-asyncio chromadb numpy
+
+# Copy service and tests
+COPY services/object-registry/app /app/services/object-registry/app
+COPY tests /app/tests
+
+ENV PYTHONPATH=/app/services/object-registry:/app
+
+CMD ["pytest", "-v", "tests/unit/"]

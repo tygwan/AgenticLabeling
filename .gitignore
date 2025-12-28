@@ -1,0 +1,97 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+test_venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Data directories (keep structure, ignore content)
+data/exports/*
+!data/exports/.gitkeep
+data/registry/*
+!data/registry/.gitkeep
+data/models/*
+!data/models/.gitkeep
+data/preprocessed/*
+!data/preprocessed/.gitkeep
+data/images/*
+!data/images/.gitkeep
+data/labels/*
+!data/labels/.gitkeep
+data/masks/*
+!data/masks/.gitkeep
+data/boxes/*
+!data/boxes/.gitkeep
+data/refined/*
+!data/refined/.gitkeep
+data/results/*
+!data/results/.gitkeep
+data/ground-truth/*
+!data/ground-truth/.gitkeep
+data/support-sets/*
+!data/support-sets/.gitkeep
+data/datasets/*
+!data/datasets/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# MLflow
+mlflow/*
+!mlflow/.gitkeep
+mlruns/
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
