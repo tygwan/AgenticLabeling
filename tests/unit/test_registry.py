@@ -360,3 +360,383 @@ class TestObjectRegistry:
         assert result["dataset_id"] == dataset_id
         assert result["object_count"] == 3
         assert "splits" in result
+
+    # ==================== Track Management Tests ====================
+
+    def test_list_tracks(self, registry):
+        """Test listing tracks with filters."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+            frame_count=100,
+            fps=30.0,
+        )
+
+        # Create objects and tracks
+        object_ids = []
+        for i in range(6):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person" if i < 3 else "car",
+                bbox=[100 + i * 10, 100, 50, 80],
+                confidence=0.9,
+            )
+            object_ids.append(obj_id)
+
+        # Create two tracks
+        track1_id = registry.create_track(source_id, object_ids[:3], "person")
+        track2_id = registry.create_track(source_id, object_ids[3:], "car")
+
+        # List all tracks
+        all_tracks = registry.list_tracks()
+        assert len(all_tracks) == 2
+
+        # List by category
+        person_tracks = registry.list_tracks(category="person")
+        assert len(person_tracks) == 1
+        assert person_tracks[0]["track_id"] == track1_id
+
+        car_tracks = registry.list_tracks(category="car")
+        assert len(car_tracks) == 1
+        assert car_tracks[0]["track_id"] == track2_id
+
+    def test_update_track(self, registry):
+        """Test updating track fields."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+            frame_count=100,
+            fps=30.0,
+        )
+
+        object_ids = []
+        for i in range(3):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            object_ids.append(obj_id)
+
+        track_id = registry.create_track(source_id, object_ids, "person")
+
+        # Update category
+        success = registry.update_track(track_id, category_name="pedestrian")
+        assert success
+
+        track = registry.get_track(track_id)
+        assert track["category_name"] == "pedestrian"
+
+        # Update validation
+        success = registry.update_track(
+            track_id,
+            is_validated=True,
+            validated_by="reviewer1"
+        )
+        assert success
+
+        track = registry.get_track(track_id)
+        assert track["is_validated"] == 1
+        assert track["validated_by"] == "reviewer1"
+
+    def test_delete_track(self, registry):
+        """Test deleting a track."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        object_ids = []
+        for i in range(3):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            object_ids.append(obj_id)
+
+        track_id = registry.create_track(source_id, object_ids, "person")
+
+        # Delete track
+        success = registry.delete_track(track_id)
+        assert success
+
+        # Verify deleted
+        track = registry.get_track(track_id)
+        assert track is None
+
+        # Objects should still exist
+        for obj_id in object_ids:
+            obj = registry.get_object(obj_id)
+            assert obj is not None
+
+    def test_merge_tracks(self, registry):
+        """Test merging multiple tracks."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        # Create objects for two tracks
+        objects_track1 = []
+        objects_track2 = []
+        for i in range(3):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            objects_track1.append(obj_id)
+
+        for i in range(2):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[200 + i * 10, 100, 50, 80],
+            )
+            objects_track2.append(obj_id)
+
+        track1_id = registry.create_track(source_id, objects_track1, "person")
+        track2_id = registry.create_track(source_id, objects_track2, "person")
+
+        # Merge tracks
+        merged_id = registry.merge_tracks([track1_id, track2_id])
+        assert merged_id is not None
+        assert merged_id.startswith("trk_")
+
+        # Verify merged track
+        merged = registry.get_track(merged_id)
+        assert len(merged["objects"]) == 5
+
+        # Original tracks should be deleted
+        assert registry.get_track(track1_id) is None
+        assert registry.get_track(track2_id) is None
+
+    def test_merge_tracks_with_new_category(self, registry):
+        """Test merging tracks with a new category name."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        objects = []
+        for i in range(4):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            objects.append(obj_id)
+
+        track1_id = registry.create_track(source_id, objects[:2], "person")
+        track2_id = registry.create_track(source_id, objects[2:], "person")
+
+        # Merge with new category
+        merged_id = registry.merge_tracks(
+            [track1_id, track2_id],
+            new_category_name="pedestrian"
+        )
+
+        merged = registry.get_track(merged_id)
+        assert merged["category_name"] == "pedestrian"
+
+    def test_merge_tracks_single_track_fails(self, registry):
+        """Test that merging a single track fails."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        obj_id = registry.register_object(
+            source_id=source_id,
+            category_name="person",
+            bbox=[100, 100, 50, 80],
+        )
+
+        track_id = registry.create_track(source_id, [obj_id], "person")
+
+        # Try to merge single track
+        result = registry.merge_tracks([track_id])
+        assert result is None
+
+    def test_split_track(self, registry):
+        """Test splitting a track."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        object_ids = []
+        for i in range(5):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            object_ids.append(obj_id)
+
+        track_id = registry.create_track(source_id, object_ids, "person")
+
+        # Split at index 2
+        result = registry.split_track(track_id, split_index=2)
+        assert result is not None
+
+        first_id, second_id = result
+
+        # Verify first track
+        first = registry.get_track(first_id)
+        assert len(first["objects"]) == 2
+
+        # Verify second track
+        second = registry.get_track(second_id)
+        assert len(second["objects"]) == 3
+
+        # Original track should be deleted
+        assert registry.get_track(track_id) is None
+
+    def test_split_track_invalid_index(self, registry):
+        """Test that splitting with invalid index fails."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        object_ids = []
+        for i in range(3):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            object_ids.append(obj_id)
+
+        track_id = registry.create_track(source_id, object_ids, "person")
+
+        # Split at index 0 should fail
+        result = registry.split_track(track_id, split_index=0)
+        assert result is None
+
+        # Split at index >= len should fail
+        result = registry.split_track(track_id, split_index=3)
+        assert result is None
+
+    def test_add_objects_to_track(self, registry):
+        """Test adding objects to a track."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        initial_objects = []
+        for i in range(3):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            initial_objects.append(obj_id)
+
+        track_id = registry.create_track(source_id, initial_objects, "person")
+
+        # Add more objects
+        new_objects = []
+        for i in range(2):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[200 + i * 10, 100, 50, 80],
+            )
+            new_objects.append(obj_id)
+
+        success = registry.add_objects_to_track(track_id, new_objects)
+        assert success
+
+        track = registry.get_track(track_id)
+        assert len(track["objects"]) == 5
+
+    def test_add_objects_at_position(self, registry):
+        """Test inserting objects at specific position."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        initial_objects = []
+        for i in range(3):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            initial_objects.append(obj_id)
+
+        track_id = registry.create_track(source_id, initial_objects, "person")
+
+        # Add object at position 1
+        new_obj = registry.register_object(
+            source_id=source_id,
+            category_name="person",
+            bbox=[50, 100, 50, 80],
+        )
+
+        success = registry.add_objects_to_track(track_id, [new_obj], insert_at=1)
+        assert success
+
+        track = registry.get_track(track_id)
+        assert len(track["objects"]) == 4
+        # New object should be at position 1
+        assert track["objects"][1]["object_id"] == new_obj
+
+    def test_remove_objects_from_track(self, registry):
+        """Test removing objects from a track."""
+        source_id = registry.register_source(
+            source_type="video",
+            file_path="/test/video.mp4",
+            width=1920,
+            height=1080,
+        )
+
+        object_ids = []
+        for i in range(5):
+            obj_id = registry.register_object(
+                source_id=source_id,
+                category_name="person",
+                bbox=[100 + i * 10, 100, 50, 80],
+            )
+            object_ids.append(obj_id)
+
+        track_id = registry.create_track(source_id, object_ids, "person")
+
+        # Remove middle objects
+        success = registry.remove_objects_from_track(
+            track_id,
+            [object_ids[1], object_ids[3]]
+        )
+        assert success
+
+        track = registry.get_track(track_id)
+        assert len(track["objects"]) == 3
+
+        # Check sequence is correct (0, 1, 2)
+        for i, obj in enumerate(track["objects"]):
+            assert obj["sequence_idx"] == i

@@ -21,6 +21,7 @@ from .schemas import (
     InferenceResponse,
     InferenceResult,
 )
+from .active_learning import ActiveLearner, SamplingStrategy
 
 
 app = FastAPI(
@@ -36,6 +37,7 @@ REGISTRY_URL = os.getenv("REGISTRY_URL", "http://object-registry:8010")
 # Store active training jobs
 training_jobs: Dict[str, Dict] = {}
 trainer = YOLOTrainer()
+active_learner = ActiveLearner()
 
 
 @app.get("/health")
@@ -496,6 +498,231 @@ async def compare_models(
         )
 
         return {"success": True, "comparison": results}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+# ==================== Active Learning ====================
+
+@app.get("/active-learning/status")
+async def get_active_learning_status():
+    """Get active learning status and labeling statistics."""
+    try:
+        stats = await active_learner.get_labeling_stats()
+        return {"success": True, "data": stats}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+@app.post("/active-learning/query")
+async def query_uncertain_samples(
+    strategy: str = Form("uncertainty"),
+    n_samples: int = Form(10),
+    min_confidence: float = Form(0.0),
+    max_confidence: float = Form(0.7),
+    category: str = Form(None),
+):
+    """Query uncertain samples for labeling.
+
+    Strategies:
+    - uncertainty: Select samples with lowest confidence
+    - entropy: Select samples with highest prediction entropy
+    - margin: Select samples with smallest margin between top predictions
+    - random: Random sampling (baseline)
+    - diversity: Embedding-based diversity sampling
+
+    Args:
+        strategy: Sampling strategy
+        n_samples: Number of samples to return
+        min_confidence: Minimum confidence threshold
+        max_confidence: Maximum confidence (filter out high-confidence samples)
+        category: Filter by specific category
+    """
+    try:
+        # Map string to enum
+        strategy_map = {
+            "uncertainty": SamplingStrategy.UNCERTAINTY,
+            "entropy": SamplingStrategy.ENTROPY,
+            "margin": SamplingStrategy.MARGIN,
+            "random": SamplingStrategy.RANDOM,
+            "diversity": SamplingStrategy.DIVERSITY,
+        }
+
+        sampling_strategy = strategy_map.get(
+            strategy.lower(),
+            SamplingStrategy.UNCERTAINTY,
+        )
+
+        samples = await active_learner.query_uncertain_samples(
+            strategy=sampling_strategy,
+            n_samples=n_samples,
+            min_confidence=min_confidence,
+            max_confidence=max_confidence,
+            exclude_validated=True,
+            category=category,
+        )
+
+        return {
+            "success": True,
+            "strategy": strategy,
+            "count": len(samples),
+            "samples": [
+                {
+                    "object_id": s.object_id,
+                    "source_id": s.source_id,
+                    "image_path": s.image_path,
+                    "confidence": s.confidence,
+                    "entropy": s.entropy,
+                    "predicted_category": s.predicted_category,
+                    "bbox": s.bbox,
+                    "uncertainty_score": round(s.uncertainty_score, 4),
+                }
+                for s in samples
+            ],
+            "next_action": "Review and validate these samples in label-studio-lite",
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+@app.post("/active-learning/cycle")
+async def run_active_learning_cycle(
+    background_tasks: BackgroundTasks,
+    project_id: str = Form(...),
+    model_path: str = Form(None),
+    strategy: str = Form("uncertainty"),
+    n_query: int = Form(10),
+    max_confidence: float = Form(0.7),
+):
+    """Run one cycle of active learning.
+
+    This endpoint:
+    1. Queries uncertain samples using the specified strategy
+    2. Returns them for human labeling
+    3. After validation, call /active-learning/retrain to retrain
+
+    Args:
+        project_id: Project identifier
+        model_path: Path to current model (optional)
+        strategy: Sampling strategy
+        n_query: Number of samples to query
+        max_confidence: Maximum confidence threshold for uncertain samples
+    """
+    try:
+        strategy_map = {
+            "uncertainty": SamplingStrategy.UNCERTAINTY,
+            "entropy": SamplingStrategy.ENTROPY,
+            "margin": SamplingStrategy.MARGIN,
+            "random": SamplingStrategy.RANDOM,
+            "diversity": SamplingStrategy.DIVERSITY,
+        }
+
+        sampling_strategy = strategy_map.get(
+            strategy.lower(),
+            SamplingStrategy.UNCERTAINTY,
+        )
+
+        result = await active_learner.run_active_learning_cycle(
+            model_path=model_path or "yolov8n.pt",
+            project_id=project_id,
+            strategy=sampling_strategy,
+            n_query=n_query,
+            max_confidence=max_confidence,
+        )
+
+        return {"success": True, "data": result}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+@app.post("/active-learning/retrain")
+async def retrain_after_labeling(
+    background_tasks: BackgroundTasks,
+    project_id: str = Form(...),
+    model_size: str = Form("yolov8n"),
+    epochs: int = Form(50),
+    only_validated: bool = Form(True),
+):
+    """Retrain model after active learning labeling cycle.
+
+    This triggers a new training run using only validated samples.
+
+    Args:
+        project_id: Project identifier
+        model_size: YOLOv8 model size
+        epochs: Number of training epochs
+        only_validated: Only use validated samples for training
+    """
+    try:
+        from .schemas import RegistryTrainingRequest
+
+        request = RegistryTrainingRequest(
+            project_id=project_id,
+            dataset_name=f"{project_id}_al_cycle_{int(time.time())}",
+            model_size=model_size,
+            epochs=epochs,
+            only_validated=only_validated,
+        )
+
+        job_id = str(uuid.uuid4())[:8]
+
+        training_jobs[job_id] = {
+            "job_id": job_id,
+            "config": request.model_dump(),
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat(),
+            "progress": 0,
+            "metrics": {},
+            "phase": "exporting",
+            "active_learning": True,
+        }
+
+        background_tasks.add_task(run_registry_training, job_id, request)
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "message": "Active learning retrain started",
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+        )
+
+
+@app.get("/active-learning/estimate")
+async def estimate_performance_gain(
+    additional_labels: int = 50,
+):
+    """Estimate model performance gain from additional labels.
+
+    Args:
+        additional_labels: Number of additional labels to estimate for
+    """
+    try:
+        stats = await active_learner.get_labeling_stats()
+        current = stats.get("validated_objects", 0)
+        target = current + additional_labels
+
+        estimate = await active_learner.estimate_model_performance_gain(
+            current_validated=current,
+            target_validated=target,
+        )
+
+        return {"success": True, "data": estimate}
     except Exception as e:
         return JSONResponse(
             status_code=500,

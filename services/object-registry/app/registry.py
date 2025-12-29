@@ -771,6 +771,331 @@ class ObjectRegistry:
         result["objects"] = [dict(obj) for obj in objects]
         return result
 
+    def list_tracks(
+        self,
+        source_id: Optional[str] = None,
+        category: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[dict]:
+        """List tracks with optional filters."""
+        conditions = []
+        params = []
+
+        if source_id:
+            conditions.append("t.source_id = ?")
+            params.append(source_id)
+        if category:
+            conditions.append("c.name = ?")
+            params.append(category)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        params.extend([limit, offset])
+
+        conn = self._get_conn()
+        rows = conn.execute(
+            f"""SELECT t.*, c.name as category_name,
+                       (SELECT COUNT(*) FROM track_objects WHERE track_id = t.track_id) as object_count
+                FROM tracks t
+                LEFT JOIN categories c ON t.category_id = c.category_id
+                WHERE {where_clause}
+                ORDER BY t.created_at DESC
+                LIMIT ? OFFSET ?""",
+            params
+        ).fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def update_track(
+        self,
+        track_id: str,
+        category_name: Optional[str] = None,
+        is_validated: Optional[bool] = None,
+        validated_by: Optional[str] = None,
+    ) -> bool:
+        """Update track fields."""
+        track = self.get_track(track_id)
+        if not track:
+            return False
+
+        conn = self._get_conn()
+        try:
+            updates = []
+            params = []
+
+            if category_name is not None:
+                category_id = self.get_or_create_category(category_name, conn=conn)
+                updates.append("category_id = ?")
+                params.append(category_id)
+
+            if is_validated is not None:
+                updates.append("is_validated = ?")
+                params.append(is_validated)
+
+            if validated_by is not None:
+                updates.append("validated_by = ?")
+                params.append(validated_by)
+
+            if not updates:
+                conn.close()
+                return False
+
+            params.append(track_id)
+            conn.execute(
+                f"UPDATE tracks SET {', '.join(updates)} WHERE track_id = ?",
+                params
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return True
+
+    def delete_track(self, track_id: str) -> bool:
+        """Delete a track and its object associations."""
+        track = self.get_track(track_id)
+        if not track:
+            return False
+
+        conn = self._get_conn()
+        try:
+            # Delete track-object associations
+            conn.execute("DELETE FROM track_objects WHERE track_id = ?", (track_id,))
+            # Delete track
+            conn.execute("DELETE FROM tracks WHERE track_id = ?", (track_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+        return True
+
+    def merge_tracks(
+        self,
+        track_ids: List[str],
+        new_category_name: Optional[str] = None,
+    ) -> Optional[str]:
+        """Merge multiple tracks into a single track.
+
+        Objects are ordered by their sequence_idx within each track,
+        then by track order in track_ids list.
+
+        Args:
+            track_ids: List of track IDs to merge (at least 2)
+            new_category_name: Category for merged track (uses first track's category if None)
+
+        Returns:
+            New track ID or None if merge fails
+        """
+        if len(track_ids) < 2:
+            return None
+
+        # Get all tracks and validate
+        tracks = []
+        for tid in track_ids:
+            track = self.get_track(tid)
+            if not track:
+                return None
+            tracks.append(track)
+
+        # Determine source_id (must be same for all tracks)
+        source_ids = set(t["source_id"] for t in tracks)
+        if len(source_ids) > 1:
+            return None  # Cannot merge tracks from different sources
+
+        source_id = tracks[0]["source_id"]
+        category_name = new_category_name or tracks[0].get("category_name")
+
+        # Collect all objects in order
+        all_objects = []
+        for track in tracks:
+            all_objects.extend(track.get("objects", []))
+
+        if not all_objects:
+            return None
+
+        object_ids = [obj["object_id"] for obj in all_objects]
+
+        # Create new merged track
+        new_track_id = self.create_track(source_id, object_ids, category_name)
+
+        # Delete old tracks
+        for tid in track_ids:
+            self.delete_track(tid)
+
+        return new_track_id
+
+    def split_track(
+        self,
+        track_id: str,
+        split_index: int,
+    ) -> Optional[Tuple[str, str]]:
+        """Split a track at the specified index.
+
+        Args:
+            track_id: Track to split
+            split_index: Index at which to split (objects at and after this index go to second track)
+
+        Returns:
+            Tuple of (first_track_id, second_track_id) or None if split fails
+        """
+        track = self.get_track(track_id)
+        if not track:
+            return None
+
+        objects = track.get("objects", [])
+        if split_index < 1 or split_index >= len(objects):
+            return None  # Invalid split point
+
+        # Split objects
+        first_objects = [obj["object_id"] for obj in objects[:split_index]]
+        second_objects = [obj["object_id"] for obj in objects[split_index:]]
+
+        source_id = track["source_id"]
+        category_name = track.get("category_name")
+
+        # Create two new tracks
+        first_track_id = self.create_track(source_id, first_objects, category_name)
+        second_track_id = self.create_track(source_id, second_objects, category_name)
+
+        # Delete original track
+        self.delete_track(track_id)
+
+        return (first_track_id, second_track_id)
+
+    def add_objects_to_track(
+        self,
+        track_id: str,
+        object_ids: List[str],
+        insert_at: Optional[int] = None,
+    ) -> bool:
+        """Add objects to an existing track.
+
+        Args:
+            track_id: Target track
+            object_ids: Objects to add
+            insert_at: Position to insert (None = append at end)
+
+        Returns:
+            True if successful
+        """
+        track = self.get_track(track_id)
+        if not track:
+            return False
+
+        conn = self._get_conn()
+        try:
+            # Get current max sequence
+            existing_objects = track.get("objects", [])
+            max_seq = len(existing_objects)
+
+            if insert_at is None:
+                # Append at end
+                for i, obj_id in enumerate(object_ids):
+                    conn.execute(
+                        "INSERT INTO track_objects (track_id, object_id, sequence_idx) VALUES (?, ?, ?)",
+                        (track_id, obj_id, max_seq + i)
+                    )
+            else:
+                # Insert at position - shift existing objects
+                insert_at = max(0, min(insert_at, max_seq))
+
+                # Shift objects after insert point
+                conn.execute(
+                    """UPDATE track_objects
+                       SET sequence_idx = sequence_idx + ?
+                       WHERE track_id = ? AND sequence_idx >= ?""",
+                    (len(object_ids), track_id, insert_at)
+                )
+
+                # Insert new objects
+                for i, obj_id in enumerate(object_ids):
+                    conn.execute(
+                        "INSERT INTO track_objects (track_id, object_id, sequence_idx) VALUES (?, ?, ?)",
+                        (track_id, obj_id, insert_at + i)
+                    )
+
+            # Update track metadata
+            self._update_track_metadata(conn, track_id)
+            conn.commit()
+        finally:
+            conn.close()
+
+        return True
+
+    def remove_objects_from_track(
+        self,
+        track_id: str,
+        object_ids: List[str],
+    ) -> bool:
+        """Remove objects from a track.
+
+        Args:
+            track_id: Target track
+            object_ids: Objects to remove
+
+        Returns:
+            True if successful
+        """
+        track = self.get_track(track_id)
+        if not track:
+            return False
+
+        conn = self._get_conn()
+        try:
+            # Remove specified objects
+            placeholders = ",".join("?" * len(object_ids))
+            conn.execute(
+                f"DELETE FROM track_objects WHERE track_id = ? AND object_id IN ({placeholders})",
+                [track_id] + object_ids
+            )
+
+            # Re-sequence remaining objects
+            remaining = conn.execute(
+                """SELECT object_id FROM track_objects
+                   WHERE track_id = ? ORDER BY sequence_idx""",
+                (track_id,)
+            ).fetchall()
+
+            for i, row in enumerate(remaining):
+                conn.execute(
+                    "UPDATE track_objects SET sequence_idx = ? WHERE track_id = ? AND object_id = ?",
+                    (i, track_id, row["object_id"])
+                )
+
+            # Update track metadata
+            self._update_track_metadata(conn, track_id)
+            conn.commit()
+        finally:
+            conn.close()
+
+        return True
+
+    def _update_track_metadata(self, conn: sqlite3.Connection, track_id: str):
+        """Update track's start/end frame and confidence based on current objects."""
+        # Get frame indices and confidences
+        rows = conn.execute(
+            """SELECT f.frame_idx, o.confidence
+               FROM track_objects to_
+               JOIN objects o ON to_.object_id = o.object_id
+               LEFT JOIN frames f ON o.frame_id = f.frame_id
+               WHERE to_.track_id = ?""",
+            (track_id,)
+        ).fetchall()
+
+        frame_indices = [r["frame_idx"] for r in rows if r["frame_idx"] is not None]
+        confidences = [r["confidence"] for r in rows if r["confidence"] is not None]
+
+        start_frame = min(frame_indices) if frame_indices else None
+        end_frame = max(frame_indices) if frame_indices else None
+        avg_confidence = sum(confidences) / len(confidences) if confidences else None
+
+        conn.execute(
+            """UPDATE tracks SET start_frame_idx = ?, end_frame_idx = ?, avg_confidence = ?
+               WHERE track_id = ?""",
+            (start_frame, end_frame, avg_confidence, track_id)
+        )
+
     # ==================== Dataset Export ====================
 
     def create_dataset(

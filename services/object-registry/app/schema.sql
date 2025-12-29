@@ -86,6 +86,9 @@ CREATE TABLE IF NOT EXISTS tracks (
     end_frame_idx INTEGER,
     object_count INTEGER DEFAULT 0,
     avg_confidence REAL,
+    is_validated BOOLEAN DEFAULT FALSE,
+    validated_by TEXT,
+    validated_at TIMESTAMP,
     metadata JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

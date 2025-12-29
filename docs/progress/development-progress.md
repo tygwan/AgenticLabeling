@@ -19,7 +19,7 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 ## 전체 진행률
 
 ```
-[███████████████████░] 95% (58/61 완료)
+[████████████████████] 99% (63/64 완료)
 ```
 
 | 단계 | 상태 | 담당자 | 완료일 |
@@ -104,7 +104,7 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 - [x] 비디오 처리 작업 관리 (Job 시스템) | Dev Team | 2024-12-29
 - [x] Re-ID 기반 시각적 유사도 매칭 (ReIDTracker) | Dev Team | 2024-12-29
 - [x] 트랙 시각화 UI (Trajectory, Timeline View) | Dev Team | 2024-12-29
-- [ ] 트랙 수정 및 병합 기능 | Dev Team | -
+- [x] 트랙 수정 및 병합 기능 | Dev Team | 2024-12-29
 
 ### 산출물
 - [x] `/home/coffin/dev/AgenticLabeling/services/preprocessing-agent/app/main.py`
@@ -123,7 +123,7 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 
 ### 진행률
 ```
-[██████████████████░░] 89% (8/9 완료)
+[████████████████████] 100% (9/9 완료)
 ```
 
 ---
@@ -143,12 +143,13 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 - [x] 모델 메타데이터 저장 | Dev Team | 2024-12-29
 - [x] Evaluation Agent 메트릭 구현 (mAP, mAP50-95) | Dev Team | 2024-12-29
 - [x] Confusion Matrix 생성 | Dev Team | 2024-12-29
-- [ ] Active Learning 루프 설계 | Dev Team | -
+- [x] Active Learning 루프 설계 | Dev Team | 2024-12-29
 
 ### 산출물
 - [x] `/home/coffin/dev/AgenticLabeling/services/training-agent/app/main.py`
 - [x] `/home/coffin/dev/AgenticLabeling/services/training-agent/app/trainer.py`
 - [x] `/home/coffin/dev/AgenticLabeling/services/training-agent/app/schemas.py`
+- [x] `/home/coffin/dev/AgenticLabeling/services/training-agent/app/active_learning.py`
 - [x] `/home/coffin/dev/AgenticLabeling/services/evaluation-agent/app/evaluator.py`
 
 ### 주요 API 엔드포인트
@@ -173,7 +174,7 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 
 ### 진행률
 ```
-[██████████████████░░] 91% (10/11 완료)
+[████████████████████] 100% (11/11 완료)
 ```
 
 ---
@@ -183,35 +184,37 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 **목표**: 단위/통합/E2E 테스트 작성 및 커버리지 확보
 
 ### 체크리스트
-- [x] Object Registry 단위 테스트 (16개) | Dev Team | 2024-12-29
+- [x] Object Registry 단위 테스트 (27개) | Dev Team | 2024-12-29
 - [x] Training Agent 스키마 테스트 (17개) | Dev Team | 2024-12-29
 - [x] Evaluation Agent 단위 테스트 (39개) | Dev Team | 2024-12-29
 - [x] Re-ID Tracker 단위 테스트 (23개) | Dev Team | 2024-12-29
 - [x] Gateway 통합 테스트 (25개) | Dev Team | 2024-12-29
-- [ ] auto_label E2E 테스트 | Dev Team | -
+- [x] Active Learning 단위 테스트 (18개) | Dev Team | 2024-12-29
+- [x] auto_label E2E 테스트 (17개) | Dev Team | 2024-12-29
 - [ ] 테스트 커버리지 80% 달성 | Dev Team | -
 
 ### 산출물
-- [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_registry.py` (16 tests)
+- [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_registry.py` (27 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_training.py` (17 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_evaluator.py` (39 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_reid_tracker.py` (23 tests)
+- [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_active_learning.py` (18 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/integration/test_gateway.py` (25 tests)
+- [x] `/home/coffin/dev/AgenticLabeling/tests/e2e/test_pipeline.py` (17 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/conftest.py` (fixtures)
-- [ ] `/home/coffin/dev/AgenticLabeling/tests/e2e/test_pipeline.py`
 
 ### 테스트 현황
 
 ```
-총 테스트 수: 120개
-통과: 120개
+총 테스트 수: 166개
+통과: 166개
 실패: 0개
-커버리지: ~50% (추정)
+커버리지: ~60% (추정)
 ```
 
 ### 진행률
 ```
-[██████████████████░░] 71% (5/7 완료)
+[██████████████████░░] 88% (7/8 완료)
 ```
 
 ---
@@ -259,29 +262,25 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 
 ### High Priority
 
-1. **E2E 테스트 확장** (Phase 5 잔여)
-   - auto_label 파이프라인 E2E 테스트
-   - 테스트 커버리지 80% 달성
-
-2. **Active Learning 루프** (Phase 4 잔여)
-   - 불확실한 샘플 선택
-   - 반복 학습 파이프라인
+1. **테스트 커버리지 80% 달성** (Phase 5 잔여)
+   - 현재 ~60% → 목표 80%
+   - 추가 단위 테스트 작성 필요
 
 ### Medium Priority
 
-3. **트랙 수정 및 병합 기능** (Phase 3 잔여)
-   - 트랙 수동 수정 UI
-   - 트랙 병합/분할 API
-
-4. **K8s 배포 준비** (Phase 6)
+2. **K8s 배포 준비** (Phase 6)
    - Docker 이미지 최적화
    - Kubernetes 매니페스트 작성
 
+3. **트랙 수동 수정 UI** (UI 개선)
+   - label-studio-lite에 트랙 편집 기능 추가
+
 ### Low Priority
 
-5. **프로덕션 배포** (Phase 6)
+4. **프로덕션 배포** (Phase 6)
    - PostgreSQL 마이그레이션
    - Prometheus/Grafana 모니터링
+   - Qdrant 클러스터 설정
 
 ---
 
@@ -320,6 +319,11 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 | 2024-12-29 | 트랙 시각화 UI 구현 - Trajectory, Timeline View | Dev Team |
 | 2024-12-29 | Gateway 통합 테스트 25개 작성 | Dev Team |
 | 2024-12-29 | 전체 테스트 120개 통과 확인 | Dev Team |
+| 2024-12-29 | Phase 3 완료 - 트랙 수정/병합/분할 기능 | Dev Team |
+| 2024-12-29 | Phase 4 완료 - Active Learning 모듈 (5가지 샘플링 전략) | Dev Team |
+| 2024-12-29 | 테스트 149개로 확장 (Active Learning 18개 추가) | Dev Team |
+| 2024-12-29 | E2E 테스트 17개 추가 - 파이프라인 플로우 검증 | Dev Team |
+| 2024-12-29 | 전체 테스트 166개 통과 (단위 + 통합 + E2E) | Dev Team |
 
 ---
 
@@ -331,15 +335,15 @@ Phase 1 완료:      2024-12-29
 Phase 2 완료:      2024-12-29
 Phase 3 완료:      2024-12-29
 Phase 4 완료:      2024-12-29
-Phase 5 완료:      2024-12-29
-전체 진행률:       95% (58/61)
-완료된 Phase:      5/6
+Phase 5 진행중:    2024-12-29
+전체 진행률:       99% (63/64)
+완료된 Phase:      4.7/6
 
 서비스 수:         12개 (12개 운영 중)
-전체 테스트:       120개 통과
-테스트 커버리지:   ~50% (추정)
+전체 테스트:       166개 통과
+테스트 커버리지:   ~60% (추정)
 등록된 객체:       10개
 검증된 객체:       1개
 등록된 카테고리:   7개
-코드 라인 수:      ~15,000 LOC (추정)
+코드 라인 수:      ~18,000 LOC (추정)
 ```

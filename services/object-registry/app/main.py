@@ -67,6 +67,30 @@ class TrackCreate(BaseModel):
     category: Optional[str] = None
 
 
+class TrackUpdate(BaseModel):
+    category: Optional[str] = None
+    is_validated: Optional[bool] = None
+    validated_by: Optional[str] = None
+
+
+class TrackMerge(BaseModel):
+    track_ids: List[str]
+    category: Optional[str] = None
+
+
+class TrackSplit(BaseModel):
+    split_index: int
+
+
+class TrackAddObjects(BaseModel):
+    object_ids: List[str]
+    insert_at: Optional[int] = None
+
+
+class TrackRemoveObjects(BaseModel):
+    object_ids: List[str]
+
+
 class DatasetCreate(BaseModel):
     name: str
     format: str = "yolo"
@@ -290,6 +314,23 @@ async def create_track(track: TrackCreate):
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 
+@app.get("/tracks")
+async def list_tracks(
+    source_id: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0),
+):
+    """List tracks with optional filters."""
+    tracks = registry.list_tracks(
+        source_id=source_id,
+        category=category,
+        limit=limit,
+        offset=offset,
+    )
+    return {"success": True, "data": tracks, "count": len(tracks)}
+
+
 @app.get("/tracks/{track_id}")
 async def get_track(track_id: str):
     """Get track with its objects."""
@@ -297,6 +338,95 @@ async def get_track(track_id: str):
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     return {"success": True, "data": track}
+
+
+@app.patch("/tracks/{track_id}")
+async def update_track(track_id: str, updates: TrackUpdate):
+    """Update track fields."""
+    success = registry.update_track(
+        track_id=track_id,
+        category_name=updates.category,
+        is_validated=updates.is_validated,
+        validated_by=updates.validated_by,
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Track not found or no valid updates")
+    return {"success": True, "track_id": track_id}
+
+
+@app.delete("/tracks/{track_id}")
+async def delete_track(track_id: str):
+    """Delete a track."""
+    success = registry.delete_track(track_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return {"success": True, "track_id": track_id}
+
+
+@app.post("/tracks/merge")
+async def merge_tracks(merge_request: TrackMerge):
+    """Merge multiple tracks into a single track."""
+    try:
+        new_track_id = registry.merge_tracks(
+            track_ids=merge_request.track_ids,
+            new_category_name=merge_request.category,
+        )
+        if not new_track_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Merge failed. Ensure all tracks exist, belong to the same source, and at least 2 tracks are provided."
+            )
+        return {"success": True, "track_id": new_track_id}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.post("/tracks/{track_id}/split")
+async def split_track(track_id: str, split_request: TrackSplit):
+    """Split a track at the specified index."""
+    try:
+        result = registry.split_track(
+            track_id=track_id,
+            split_index=split_request.split_index,
+        )
+        if not result:
+            raise HTTPException(
+                status_code=400,
+                detail="Split failed. Ensure track exists and split_index is valid (1 <= index < object_count)."
+            )
+        first_track_id, second_track_id = result
+        return {
+            "success": True,
+            "first_track_id": first_track_id,
+            "second_track_id": second_track_id,
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.post("/tracks/{track_id}/objects")
+async def add_objects_to_track(track_id: str, request: TrackAddObjects):
+    """Add objects to an existing track."""
+    success = registry.add_objects_to_track(
+        track_id=track_id,
+        object_ids=request.object_ids,
+        insert_at=request.insert_at,
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return {"success": True, "track_id": track_id}
+
+
+@app.delete("/tracks/{track_id}/objects")
+async def remove_objects_from_track(track_id: str, request: TrackRemoveObjects):
+    """Remove objects from a track."""
+    success = registry.remove_objects_from_track(
+        track_id=track_id,
+        object_ids=request.object_ids,
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return {"success": True, "track_id": track_id}
 
 
 # ==================== Datasets ====================
