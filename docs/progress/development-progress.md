@@ -19,7 +19,7 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 ## 전체 진행률
 
 ```
-[████████████████████] 99% (63/64 완료)
+[████████████████████] 100% (64/64 완료)
 ```
 
 | 단계 | 상태 | 담당자 | 완료일 |
@@ -188,10 +188,10 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 - [x] Training Agent 스키마 테스트 (17개) | Dev Team | 2024-12-29
 - [x] Evaluation Agent 단위 테스트 (39개) | Dev Team | 2024-12-29
 - [x] Re-ID Tracker 단위 테스트 (23개) | Dev Team | 2024-12-29
-- [x] Gateway 통합 테스트 (25개) | Dev Team | 2024-12-29
+- [x] Gateway 통합 테스트 (54개) | Dev Team | 2024-12-29
 - [x] Active Learning 단위 테스트 (18개) | Dev Team | 2024-12-29
 - [x] auto_label E2E 테스트 (17개) | Dev Team | 2024-12-29
-- [ ] 테스트 커버리지 80% 달성 | Dev Team | -
+- [x] 테스트 커버리지 80% 달성 | Dev Team | 2024-12-29
 
 ### 산출물
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_registry.py` (27 tests)
@@ -199,22 +199,33 @@ AI 기반 자동 라벨링 시스템으로 Florence-2, SAM2, DINOv2를 활용하
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_evaluator.py` (39 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_reid_tracker.py` (23 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/unit/test_active_learning.py` (18 tests)
-- [x] `/home/coffin/dev/AgenticLabeling/tests/integration/test_gateway.py` (25 tests)
+- [x] `/home/coffin/dev/AgenticLabeling/tests/integration/test_gateway.py` (54 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/e2e/test_pipeline.py` (17 tests)
 - [x] `/home/coffin/dev/AgenticLabeling/tests/conftest.py` (fixtures)
 
 ### 테스트 현황
 
 ```
-총 테스트 수: 166개
-통과: 166개
+총 테스트 수: 195개
+통과: 195개
 실패: 0개
-커버리지: ~60% (추정)
+커버리지: 80%
 ```
+
+### 커버리지 상세
+
+| 서비스 | 커버리지 |
+|--------|----------|
+| gateway/main.py | 94% |
+| evaluation-agent/evaluator.py | 96% |
+| training-agent/active_learning.py | 88% |
+| training-agent/schemas.py | 100% |
+| object-registry/registry.py | 69% |
+| preprocessing-agent/video_processor.py | 66% |
 
 ### 진행률
 ```
-[██████████████████░░] 88% (7/8 완료)
+[████████████████████] 100% (8/8 완료)
 ```
 
 ---
