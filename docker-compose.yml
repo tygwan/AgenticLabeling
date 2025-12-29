@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   gateway:
     build: ./services/gateway
@@ -176,9 +174,12 @@ services:
     build: ./services/label-studio-lite
     ports:
       - "8501:8501"
+    volumes:
+      - ./data:/data
     environment:
       - REGISTRY_URL=http://object-registry:8010
       - GATEWAY_URL=http://gateway:8000
+      - DATA_DIR=/data
     depends_on:
       - object-registry
       - gateway

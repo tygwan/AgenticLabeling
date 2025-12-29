@@ -1,6 +1,12 @@
-"""Label Studio Lite - Object Validation UI."""
+"""Label Studio Lite - Object Validation UI.
+
+X-AnyLabeling inspired design with professional annotation workflow.
+Claude/Anthropic warm color palette.
+"""
 import os
 from io import BytesIO
+from datetime import datetime
+from typing import Optional, List, Dict, Any
 
 import httpx
 import pandas as pd
@@ -8,631 +14,1043 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 
 # Configuration
-REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8010")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000")
+REGISTRY_URL = os.getenv("REGISTRY_URL", "http://object-registry:8010")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:8000")
+DATA_DIR = os.getenv("DATA_DIR", "/data")
 
-# Color palette for track visualization
+# Anthropic/Claude Color Palette
+COLORS = {
+    "bg_primary": "#FAF9F6",
+    "bg_secondary": "#F5F1EB",
+    "bg_dark": "#1A1A1A",
+    "bg_card": "#FFFFFF",
+    "accent": "#DA7756",
+    "accent_hover": "#C66A4A",
+    "accent_light": "#F5E6E0",
+    "text_primary": "#1A1A1A",
+    "text_secondary": "#6B6B6B",
+    "text_muted": "#9CA3AF",
+    "success": "#10B981",
+    "error": "#EF4444",
+    "warning": "#F59E0B",
+    "info": "#3B82F6",
+    "border": "#E5E5E5",
+    "border_focus": "#DA7756",
+}
+
+# Track colors for visualization
 TRACK_COLORS = [
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7",
-    "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
-    "#F8B500", "#00CED1", "#FF69B4", "#32CD32", "#FF4500",
+    "#DA7756", "#4ECDC4", "#45B7D1", "#96CEB4", "#F7DC6F",
+    "#BB8FCE", "#85C1E9", "#F8B500", "#00CED1", "#32CD32",
 ]
 
 # Page config
 st.set_page_config(
-    page_title="Label Studio Lite",
+    page_title="AgenticLabeling",
     page_icon="🏷️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS
-st.markdown("""
+# Session state initialization
+if "selected_object_idx" not in st.session_state:
+    st.session_state.selected_object_idx = None
+if "current_image_idx" not in st.session_state:
+    st.session_state.current_image_idx = 0
+if "zoom_level" not in st.session_state:
+    st.session_state.zoom_level = 1.0
+if "show_labels" not in st.session_state:
+    st.session_state.show_labels = True
+if "show_bboxes" not in st.session_state:
+    st.session_state.show_bboxes = True
+
+
+# X-AnyLabeling inspired CSS
+st.markdown(f"""
 <style>
-    .stButton>button {
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    /* Global */
+    .stApp {{
+        background-color: {COLORS["bg_primary"]};
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }}
+
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+
+    /* Top Toolbar */
+    .toolbar {{
+        background: {COLORS["bg_dark"]};
+        padding: 8px 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+    }}
+
+    .toolbar-brand {{
+        color: white;
+        font-weight: 700;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }}
+
+    .toolbar-divider {{
+        width: 1px;
+        height: 24px;
+        background: #444;
+    }}
+
+    .toolbar-item {{
+        color: #ccc;
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }}
+
+    .toolbar-item:hover {{
+        background: #333;
+        color: white;
+    }}
+
+    .toolbar-progress {{
+        color: {COLORS["accent"]};
+        font-weight: 600;
+        margin-left: auto;
+    }}
+
+    /* Left Sidebar */
+    [data-testid="stSidebar"] {{
+        background-color: {COLORS["bg_secondary"]};
+        border-right: 1px solid {COLORS["border"]};
+    }}
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{
+        color: {COLORS["text_primary"]};
+    }}
+
+    /* Panel Headers */
+    .panel-header {{
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: {COLORS["text_secondary"]};
+        padding: 12px 0 8px 0;
+        border-bottom: 1px solid {COLORS["border"]};
+        margin-bottom: 12px;
+    }}
+
+    /* Tool Buttons */
+    .tool-btn {{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s;
+        color: {COLORS["text_primary"]};
+        font-size: 0.875rem;
+    }}
+
+    .tool-btn:hover {{
+        background: {COLORS["accent_light"]};
+        border-color: {COLORS["accent"]};
+    }}
+
+    .tool-btn.active {{
+        background: {COLORS["accent"]};
+        color: white;
+    }}
+
+    .tool-icon {{
+        width: 20px;
+        text-align: center;
+    }}
+
+    /* Object List Item */
+    .object-item {{
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: 1px solid transparent;
+    }}
+
+    .object-item:hover {{
+        background: {COLORS["bg_secondary"]};
+    }}
+
+    .object-item.selected {{
+        background: {COLORS["accent_light"]};
+        border-color: {COLORS["accent"]};
+    }}
+
+    .object-item.validated {{
+        border-left: 3px solid {COLORS["success"]};
+    }}
+
+    .object-checkbox {{
+        margin-right: 10px;
+    }}
+
+    .object-label {{
+        flex: 1;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }}
+
+    .object-confidence {{
+        font-size: 0.75rem;
+        color: {COLORS["text_muted"]};
+        background: {COLORS["bg_secondary"]};
+        padding: 2px 8px;
+        border-radius: 12px;
+    }}
+
+    /* Canvas Container */
+    .canvas-container {{
+        background: {COLORS["bg_card"]};
+        border-radius: 8px;
+        border: 1px solid {COLORS["border"]};
+        padding: 16px;
+        min-height: 500px;
+    }}
+
+    /* Status Bar */
+    .status-bar {{
+        background: {COLORS["bg_dark"]};
+        color: #ccc;
+        padding: 8px 16px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        font-size: 0.8rem;
+        margin-top: 16px;
+    }}
+
+    .status-item {{
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }}
+
+    .status-icon {{
+        opacity: 0.7;
+    }}
+
+    /* Right Panel - Label Editor */
+    .label-editor {{
+        background: {COLORS["bg_card"]};
+        border-radius: 8px;
+        border: 1px solid {COLORS["border"]};
+        padding: 16px;
+    }}
+
+    .label-field {{
+        margin-bottom: 16px;
+    }}
+
+    .label-field-label {{
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: {COLORS["text_secondary"]};
+        margin-bottom: 6px;
+    }}
+
+    /* Action Buttons */
+    .action-btn {{
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: none;
         width: 100%;
-    }
-    .valid-btn>button {
-        background-color: #28a745;
+        margin-bottom: 8px;
+    }}
+
+    .action-btn-primary {{
+        background: {COLORS["accent"]};
         color: white;
-    }
-    .reject-btn>button {
-        background-color: #dc3545;
+    }}
+
+    .action-btn-primary:hover {{
+        background: {COLORS["accent_hover"]};
+    }}
+
+    .action-btn-success {{
+        background: {COLORS["success"]};
         color: white;
-    }
-    .bbox-info {
-        background-color: #f8f9fa;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 5px 0;
-    }
+    }}
+
+    .action-btn-danger {{
+        background: {COLORS["error"]};
+        color: white;
+    }}
+
+    .action-btn-secondary {{
+        background: transparent;
+        border: 1px solid {COLORS["border"]};
+        color: {COLORS["text_primary"]};
+    }}
+
+    /* Stats Cards */
+    .stat-card {{
+        background: {COLORS["bg_card"]};
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        border: 1px solid {COLORS["border"]};
+    }}
+
+    .stat-value {{
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: {COLORS["accent"]};
+    }}
+
+    .stat-label {{
+        font-size: 0.7rem;
+        color: {COLORS["text_muted"]};
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }}
+
+    /* Badge */
+    .badge {{
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }}
+
+    .badge-success {{
+        background: #D1FAE5;
+        color: #065F46;
+    }}
+
+    .badge-warning {{
+        background: #FEF3C7;
+        color: #92400E;
+    }}
+
+    .badge-error {{
+        background: #FEE2E2;
+        color: #991B1B;
+    }}
+
+    /* Keyboard Shortcut */
+    .kbd {{
+        display: inline-block;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+        font-family: monospace;
+        background: {COLORS["bg_secondary"]};
+        border: 1px solid {COLORS["border"]};
+        border-radius: 4px;
+        color: {COLORS["text_secondary"]};
+    }}
+
+    /* Streamlit overrides */
+    .stButton > button {{
+        background-color: {COLORS["accent"]};
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }}
+
+    .stButton > button:hover {{
+        background-color: {COLORS["accent_hover"]};
+    }}
+
+    hr {{
+        border: none;
+        height: 1px;
+        background: {COLORS["border"]};
+        margin: 16px 0;
+    }}
+
+    /* Empty State */
+    .empty-state {{
+        text-align: center;
+        padding: 48px 24px;
+        color: {COLORS["text_muted"]};
+    }}
+
+    .empty-icon {{
+        font-size: 3rem;
+        margin-bottom: 16px;
+    }}
+
+    /* Error Container */
+    .error-container {{
+        background: #FEF2F2;
+        border: 1px solid #FECACA;
+        border-radius: 8px;
+        padding: 16px;
+        color: #991B1B;
+    }}
+
+    /* Info Box */
+    .info-box {{
+        background: {COLORS["accent_light"]};
+        border: 1px solid {COLORS["accent"]};
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 0.875rem;
+        color: {COLORS["text_primary"]};
+    }}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==================== API Functions ====================
 
-@st.cache_data(ttl=30)
-def get_stats():
-    """Get registry statistics."""
+def api_request(method: str, url: str, **kwargs) -> tuple:
+    """Make API request with error handling."""
     try:
-        resp = httpx.get(f"{REGISTRY_URL}/stats", timeout=10.0)
+        kwargs.setdefault("timeout", 10.0)
+        if method == "GET":
+            resp = httpx.get(url, **kwargs)
+        elif method == "POST":
+            resp = httpx.post(url, **kwargs)
+        elif method == "PATCH":
+            resp = httpx.patch(url, **kwargs)
+        elif method == "DELETE":
+            resp = httpx.delete(url, **kwargs)
+        else:
+            return None, f"Unknown method: {method}"
+
         data = resp.json()
-        return data.get("data", {}) if data.get("success") else {}
+        if data.get("success"):
+            return data.get("data"), None
+        return None, data.get("error", "Unknown error")
+    except httpx.ConnectError:
+        return None, "서비스에 연결할 수 없습니다"
+    except httpx.TimeoutException:
+        return None, "요청 시간 초과"
     except Exception as e:
-        st.error(f"Failed to get stats: {e}")
-        return {}
+        return None, str(e)
+
+
+@st.cache_data(ttl=30)
+def get_stats() -> dict:
+    """Get registry statistics."""
+    data, error = api_request("GET", f"{REGISTRY_URL}/stats")
+    return data if data else {}
 
 
 @st.cache_data(ttl=10)
-def get_categories():
+def get_categories() -> list:
     """Get all categories."""
-    try:
-        resp = httpx.get(f"{REGISTRY_URL}/categories", timeout=10.0)
-        data = resp.json()
-        return data.get("data", []) if data.get("success") else []
-    except Exception:
-        return []
+    data, error = api_request("GET", f"{REGISTRY_URL}/categories")
+    return data if data else []
 
 
-def get_objects(
-    is_validated: bool = None,
-    category: str = None,
-    project_id: str = None,
-    limit: int = 100,
-):
+def get_objects(is_validated=None, category=None, limit=100) -> tuple:
     """Get objects with filters."""
     params = {"limit": limit}
     if is_validated is not None:
         params["is_validated"] = is_validated
     if category:
         params["category"] = category
-    if project_id:
-        params["project_id"] = project_id
-
-    try:
-        resp = httpx.get(f"{REGISTRY_URL}/objects", params=params, timeout=10.0)
-        data = resp.json()
-        return data.get("data", []) if data.get("success") else []
-    except Exception as e:
-        st.error(f"Failed to get objects: {e}")
-        return []
+    data, error = api_request("GET", f"{REGISTRY_URL}/objects", params=params)
+    return (data if data else [], error)
 
 
-def get_object_detail(object_id: str):
-    """Get single object details."""
-    try:
-        resp = httpx.get(f"{REGISTRY_URL}/objects/{object_id}", timeout=10.0)
-        data = resp.json()
-        return data.get("data") if data.get("success") else None
-    except Exception:
-        return None
+def get_sources(limit=50) -> list:
+    """Get source list."""
+    data, error = api_request("GET", f"{REGISTRY_URL}/sources", params={"limit": limit})
+    return data if data else []
 
 
-def get_source(source_id: str):
+def get_source(source_id: str) -> Optional[dict]:
     """Get source details."""
-    try:
-        resp = httpx.get(f"{REGISTRY_URL}/sources/{source_id}", timeout=10.0)
-        data = resp.json()
-        return data.get("data") if data.get("success") else None
-    except Exception:
+    data, error = api_request("GET", f"{REGISTRY_URL}/sources/{source_id}")
+    return data
+
+
+def get_objects_by_source(source_id: str) -> list:
+    """Get objects for a specific source."""
+    data, error = api_request("GET", f"{REGISTRY_URL}/objects", params={"source_id": source_id, "limit": 200})
+    return data if data else []
+
+
+def validate_object(object_id: str, reviewer: str, quality: float) -> bool:
+    """Validate an object."""
+    data, error = api_request(
+        "PATCH",
+        f"{REGISTRY_URL}/objects/{object_id}",
+        json={"is_validated": True, "validated_by": reviewer, "quality_score": quality}
+    )
+    return error is None
+
+
+def reject_object(object_id: str) -> bool:
+    """Reject/delete an object."""
+    data, error = api_request("DELETE", f"{REGISTRY_URL}/objects/{object_id}")
+    return error is None
+
+
+def get_tracks(source_id: str) -> list:
+    """Get tracks for a source."""
+    data, error = api_request("GET", f"{REGISTRY_URL}/tracks", params={"source_id": source_id})
+    return data if data else []
+
+
+# ==================== Image Functions ====================
+
+def load_source_image(source_id: str) -> Optional[Image.Image]:
+    """Load source image from file system."""
+    source = get_source(source_id)
+    if not source:
         return None
 
-
-def validate_object(object_id: str, validated_by: str, quality_score: float):
-    """Mark object as validated."""
-    try:
-        resp = httpx.patch(
-            f"{REGISTRY_URL}/objects/{object_id}",
-            json={
-                "is_validated": True,
-                "validated_by": validated_by,
-                "quality_score": quality_score,
-            },
-            timeout=10.0,
-        )
-        return resp.json().get("success", False)
-    except Exception:
-        return False
-
-
-def reject_object(object_id: str):
-    """Delete/reject an object."""
-    try:
-        resp = httpx.delete(f"{REGISTRY_URL}/objects/{object_id}", timeout=10.0)
-        return resp.json().get("success", False)
-    except Exception:
-        return False
-
-
-def update_object_bbox(object_id: str, bbox: dict):
-    """Update object bounding box (placeholder - not yet implemented in registry)."""
-    # TODO: Implement bbox update in registry
-    return False
-
-
-@st.cache_data(ttl=30)
-def get_sources():
-    """Get all video sources for track visualization."""
-    try:
-        resp = httpx.get(f"{REGISTRY_URL}/stats", timeout=10.0)
-        data = resp.json()
-        # Get sources with tracks (videos)
-        return data.get("data", {}) if data.get("success") else {}
-    except Exception:
-        return {}
-
-
-def get_track(track_id: str):
-    """Get track details with objects."""
-    try:
-        resp = httpx.get(f"{REGISTRY_URL}/tracks/{track_id}", timeout=10.0)
-        data = resp.json()
-        return data.get("data") if data.get("success") else None
-    except Exception:
+    file_path = source.get("file_path")
+    if not file_path:
         return None
 
+    paths_to_try = [
+        file_path,
+        os.path.join(DATA_DIR, file_path),
+        os.path.join(DATA_DIR, "uploads", os.path.basename(file_path)),
+    ]
 
-def get_tracks_for_source(source_id: str):
-    """Get all tracks for a specific source."""
-    try:
-        # Search objects for this source and group by tracks
-        resp = httpx.get(
-            f"{REGISTRY_URL}/objects",
-            params={"source_id": source_id, "limit": 1000},
-            timeout=30.0,
-        )
-        data = resp.json()
-        objects = data.get("data", []) if data.get("success") else []
-
-        # Group by track_id
-        tracks = {}
-        for obj in objects:
-            track_id = obj.get("track_id")
-            if track_id:
-                if track_id not in tracks:
-                    tracks[track_id] = {
-                        "track_id": track_id,
-                        "category": obj.get("category_name"),
-                        "objects": [],
-                    }
-                tracks[track_id]["objects"].append(obj)
-
-        # Sort objects by frame_id within each track
-        for track in tracks.values():
-            track["objects"].sort(key=lambda x: x.get("frame_id", ""))
-            track["length"] = len(track["objects"])
-
-        return list(tracks.values())
-    except Exception as e:
-        st.error(f"Failed to get tracks: {e}")
-        return []
+    for path in paths_to_try:
+        if path and os.path.exists(path):
+            try:
+                return Image.open(path).convert("RGB")
+            except Exception:
+                continue
+    return None
 
 
-def search_objects_by_source(source_id: str, limit: int = 500):
-    """Get all objects for a source."""
-    try:
-        resp = httpx.get(
-            f"{REGISTRY_URL}/objects",
-            params={"source_id": source_id, "limit": limit},
-            timeout=30.0,
-        )
-        data = resp.json()
-        return data.get("data", []) if data.get("success") else []
-    except Exception:
-        return []
-
-
-# ==================== Drawing Functions ====================
-
-def draw_bbox_on_image(
-    image: Image.Image,
-    bbox: tuple,
-    label: str,
-    color: str = "#00FF00",
-    thickness: int = 3,
-) -> Image.Image:
-    """Draw bounding box on image."""
-    draw = ImageDraw.Draw(image)
-    x, y, w, h = bbox
-
-    # Draw rectangle
-    draw.rectangle([x, y, x + w, y + h], outline=color, width=thickness)
-
-    # Draw label background
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
-    except:
-        font = ImageFont.load_default()
-
-    text_bbox = draw.textbbox((x, y - 20), label, font=font)
-    draw.rectangle(text_bbox, fill=color)
-    draw.text((x, y - 20), label, fill="white", font=font)
-
-    return image
-
-
-def create_placeholder_image(width: int, height: int, text: str = "No Image") -> Image.Image:
+def create_placeholder_image(width: int, height: int, text: str = "") -> Image.Image:
     """Create a placeholder image."""
-    img = Image.new("RGB", (width, height), color="#f0f0f0")
+    img = Image.new("RGB", (width, height), color="#F5F1EB")
     draw = ImageDraw.Draw(img)
 
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-    except:
-        font = ImageFont.load_default()
+    # Grid pattern
+    for i in range(0, width, 20):
+        draw.line([(i, 0), (i, height)], fill="#E5E5E5", width=1)
+    for i in range(0, height, 20):
+        draw.line([(0, i), (width, i)], fill="#E5E5E5", width=1)
 
-    text_bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
-
-    x = (width - text_width) // 2
-    y = (height - text_height) // 2
-    draw.text((x, y), text, fill="#999999", font=font)
+    if text:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+        except:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        x = (width - (bbox[2] - bbox[0])) // 2
+        y = (height - (bbox[3] - bbox[1])) // 2
+        draw.text((x, y), text, fill="#9CA3AF", font=font)
 
     return img
 
 
-def draw_track_trajectory(
-    image: Image.Image,
-    track_objects: list,
-    color: str,
-    show_bbox: bool = True,
-    line_width: int = 2,
-) -> Image.Image:
-    """Draw track trajectory with bounding boxes on image."""
-    draw = ImageDraw.Draw(image)
+def draw_annotations(image: Image.Image, objects: list, selected_idx: Optional[int] = None,
+                     show_labels: bool = True, show_bboxes: bool = True) -> Image.Image:
+    """Draw bounding boxes and labels on image."""
+    if not show_bboxes:
+        return image
 
-    # Get center points for trajectory line
-    centers = []
-    for obj in track_objects:
+    img = image.copy()
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+    except:
+        font = ImageFont.load_default()
+
+    for idx, obj in enumerate(objects):
         x = obj.get("bbox_x", 0)
         y = obj.get("bbox_y", 0)
         w = obj.get("bbox_w", 0)
         h = obj.get("bbox_h", 0)
-        center_x = x + w / 2
-        center_y = y + h / 2
-        centers.append((center_x, center_y))
 
-    # Draw trajectory line
-    if len(centers) > 1:
-        for i in range(len(centers) - 1):
-            draw.line([centers[i], centers[i + 1]], fill=color, width=line_width)
+        # Color based on selection and validation
+        is_selected = idx == selected_idx
+        is_validated = obj.get("is_validated", False)
 
-    # Draw center points
-    for cx, cy in centers:
-        r = 4
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
-
-    # Draw bounding boxes
-    if show_bbox:
-        for i, obj in enumerate(track_objects):
-            x = obj.get("bbox_x", 0)
-            y = obj.get("bbox_y", 0)
-            w = obj.get("bbox_w", 0)
-            h = obj.get("bbox_h", 0)
-            # Use lighter color for older boxes
-            alpha = 0.3 + 0.7 * (i / max(len(track_objects) - 1, 1))
-            draw.rectangle(
-                [x, y, x + w, y + h],
-                outline=color,
-                width=max(1, int(line_width * alpha)),
-            )
-
-    return image
-
-
-def create_track_visualization(
-    width: int,
-    height: int,
-    tracks: list,
-    selected_track_ids: list = None,
-    show_all_tracks: bool = True,
-) -> Image.Image:
-    """Create visualization showing multiple tracks."""
-    img = Image.new("RGB", (width, height), color="#2C3E50")
-    draw = ImageDraw.Draw(img)
-
-    # Draw grid
-    grid_color = "#3D566E"
-    for x in range(0, width, 50):
-        draw.line([(x, 0), (x, height)], fill=grid_color, width=1)
-    for y in range(0, height, 50):
-        draw.line([(0, y), (width, y)], fill=grid_color, width=1)
-
-    # Draw tracks
-    for idx, track in enumerate(tracks):
-        track_id = track.get("track_id")
-
-        # Filter by selection if provided
-        if selected_track_ids and track_id not in selected_track_ids:
-            if not show_all_tracks:
-                continue
-            # Draw unselected tracks with reduced opacity (gray)
-            color = "#666666"
-            line_width = 1
+        if is_selected:
+            color = COLORS["accent"]
+            width = 3
+        elif is_validated:
+            color = COLORS["success"]
+            width = 2
         else:
             color = TRACK_COLORS[idx % len(TRACK_COLORS)]
-            line_width = 3
+            width = 2
 
-        objects = track.get("objects", [])
-        if objects:
-            img = draw_track_trajectory(
-                img,
-                objects,
-                color,
-                show_bbox=(track_id in (selected_track_ids or [])) or not selected_track_ids,
-                line_width=line_width,
-            )
+        # Draw bbox
+        draw.rectangle([x, y, x + w, y + h], outline=color, width=width)
 
-    return img
+        # Draw label
+        if show_labels:
+            label = obj.get("category_name", "unknown")
+            conf = obj.get("confidence")
+            if conf:
+                label += f" {conf:.0%}"
 
-
-def create_track_timeline(
-    tracks: list,
-    total_frames: int,
-    width: int = 800,
-    height: int = 200,
-) -> Image.Image:
-    """Create a timeline visualization of tracks."""
-    img = Image.new("RGB", (width, height), color="#1E1E1E")
-    draw = ImageDraw.Draw(img)
-
-    if not tracks or total_frames == 0:
-        return img
-
-    # Calculate track row height
-    row_height = max(20, min(40, (height - 40) // max(len(tracks), 1)))
-    padding = 10
-
-    # Draw frame markers
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-    except:
-        font = ImageFont.load_default()
-
-    for i in range(0, total_frames + 1, max(1, total_frames // 10)):
-        x = padding + (width - 2 * padding) * i / total_frames
-        draw.line([(x, 0), (x, height)], fill="#333333", width=1)
-        draw.text((x, height - 15), str(i), fill="#888888", font=font)
-
-    # Draw each track
-    y = padding
-    for idx, track in enumerate(tracks):
-        color = TRACK_COLORS[idx % len(TRACK_COLORS)]
-        objects = track.get("objects", [])
-
-        if objects:
-            # Get frame range
-            frame_ids = []
-            for obj in objects:
-                frame_id = obj.get("frame_id", "")
-                # Extract frame number from frame_id (e.g., "frame_0001" -> 1)
-                try:
-                    if frame_id.startswith("frame_"):
-                        frame_num = int(frame_id.split("_")[1])
-                    else:
-                        frame_num = int(frame_id)
-                    frame_ids.append(frame_num)
-                except (ValueError, IndexError):
-                    pass
-
-            if frame_ids:
-                min_frame = min(frame_ids)
-                max_frame = max(frame_ids)
-
-                x1 = padding + (width - 2 * padding) * min_frame / total_frames
-                x2 = padding + (width - 2 * padding) * max_frame / total_frames
-
-                # Draw track bar
-                draw.rectangle(
-                    [x1, y + 2, x2, y + row_height - 2],
-                    fill=color,
-                    outline=None,
-                )
-
-                # Draw track label
-                label = f"{track.get('category', 'obj')} ({len(objects)})"
-                draw.text((x1 + 2, y + 4), label, fill="white", font=font)
-
-        y += row_height
+            text_bbox = draw.textbbox((x, y - 18), label, font=font)
+            draw.rectangle(text_bbox, fill=color)
+            draw.text((x, y - 18), label, fill="white", font=font)
 
     return img
 
 
 # ==================== UI Components ====================
 
-def render_sidebar():
-    """Render sidebar with filters and stats."""
-    st.sidebar.title("🏷️ Label Studio Lite")
+def render_toolbar(stats: dict):
+    """Render top toolbar."""
+    total = stats.get("objects", 0) or 0
+    validated = stats.get("validated_objects", 0) or 0
+    progress_pct = (validated / total * 100) if total > 0 else 0
 
-    # Stats
-    stats = get_stats()
-    if stats:
-        st.sidebar.subheader("📊 Statistics")
-        col1, col2 = st.sidebar.columns(2)
-        col1.metric("Objects", stats.get("objects", 0))
-        col2.metric("Validated", stats.get("validated_objects", 0))
-
-        col3, col4 = st.sidebar.columns(2)
-        col3.metric("Categories", stats.get("categories", 0))
-        col4.metric("Sources", stats.get("sources", 0))
-
-    st.sidebar.divider()
-
-    # Filters
-    st.sidebar.subheader("🔍 Filters")
-
-    # Validation status filter
-    validation_filter = st.sidebar.radio(
-        "Validation Status",
-        ["All", "Pending", "Validated"],
-        index=1,  # Default to Pending
-    )
-
-    is_validated = None
-    if validation_filter == "Pending":
-        is_validated = False
-    elif validation_filter == "Validated":
-        is_validated = True
-
-    # Category filter
-    categories = get_categories()
-    category_names = ["All"] + [c["name"] for c in categories]
-    selected_category = st.sidebar.selectbox("Category", category_names)
-    category = None if selected_category == "All" else selected_category
-
-    # Reviewer name
-    reviewer_name = st.sidebar.text_input("Reviewer Name", value="reviewer_001")
-
-    # Quality score default
-    default_quality = st.sidebar.slider("Default Quality Score", 0.0, 1.0, 0.9, 0.05)
-
-    return {
-        "is_validated": is_validated,
-        "category": category,
-        "reviewer_name": reviewer_name,
-        "default_quality": default_quality,
-    }
+    st.markdown(f"""
+    <div class="toolbar">
+        <div class="toolbar-brand">🏷️ AgenticLabeling</div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-item">📁 파일</div>
+        <div class="toolbar-item">👁️ 보기</div>
+        <div class="toolbar-item">🔧 도구</div>
+        <div class="toolbar-item">❓ 도움말</div>
+        <div class="toolbar-progress">
+            진행률: {validated}/{total} ({progress_pct:.0f}% 완료)
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-def render_object_card(obj: dict, filters: dict, idx: int):
-    """Render a single object card with image and controls."""
-    object_id = obj.get("object_id")
-    category_name = obj.get("category_name", "unknown")
-    confidence = obj.get("confidence")
-    is_validated = obj.get("is_validated")
-    source_id = obj.get("source_id")
+def render_status_bar(source: Optional[dict], objects: list, current_idx: int):
+    """Render bottom status bar."""
+    filename = source.get("file_path", "없음").split("/")[-1] if source else "선택 없음"
+    total = len(objects)
+    validated = sum(1 for o in objects if o.get("is_validated"))
+    width = source.get("width", 0) if source else 0
+    height = source.get("height", 0) if source else 0
 
-    # Bounding box
-    bbox = (
-        obj.get("bbox_x", 0),
-        obj.get("bbox_y", 0),
-        obj.get("bbox_w", 100),
-        obj.get("bbox_h", 100),
-    )
+    st.markdown(f"""
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-icon">📁</span>
+            <span>{filename}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-icon">🖼️</span>
+            <span>{width} × {height}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-icon">📦</span>
+            <span>객체 {total}개 (검증됨 {validated})</span>
+        </div>
+        <div class="status-item">
+            <span class="status-icon">⏱️</span>
+            <span>{datetime.now().strftime('%H:%M:%S')}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Get source info
-    source = get_source(source_id) if source_id else None
-    img_width = source.get("width", 640) if source else 640
-    img_height = source.get("height", 480) if source else 480
 
-    # Create image with bbox
-    # In production, load actual image from file_path
-    img = create_placeholder_image(img_width, img_height, f"Source: {source_id[:12]}...")
-
-    # Draw bbox
-    label = f"{category_name}"
-    if confidence:
-        label += f" ({confidence:.2f})"
-    color = "#00FF00" if is_validated else "#FF6B6B"
-    img = draw_bbox_on_image(img, bbox, label, color)
-
-    # Display
-    with st.container():
-        st.image(img, use_container_width=True)
-
-        # Info
-        st.markdown(f"""
-        <div class="bbox-info">
-            <strong>ID:</strong> {object_id}<br>
-            <strong>Category:</strong> {category_name}<br>
-            <strong>Confidence:</strong> {confidence:.2f if confidence else 'N/A'}<br>
-            <strong>BBox:</strong> x={bbox[0]:.0f}, y={bbox[1]:.0f}, w={bbox[2]:.0f}, h={bbox[3]:.0f}<br>
-            <strong>Status:</strong> {'✅ Validated' if is_validated else '⏳ Pending'}
+def render_left_sidebar(stats: dict, categories: list) -> dict:
+    """Render left sidebar with tools and filters."""
+    with st.sidebar:
+        # Logo
+        st.markdown("""
+        <div style="padding: 16px 0; border-bottom: 1px solid #E5E5E5; margin-bottom: 16px;">
+            <div style="font-size: 1.25rem; font-weight: 700;">🏷️ AgenticLabeling</div>
+            <div style="font-size: 0.75rem; color: #9CA3AF;">AI-Powered Labeling</div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Action buttons
-        if not is_validated:
-            col1, col2 = st.columns(2)
+        # Quick Stats
+        st.markdown('<div class="panel-header">📊 통계</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"""
+            <div class="stat-card">
+                <div class="stat-value">{stats.get('objects', 0)}</div>
+                <div class="stat-label">전체</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div class="stat-card">
+                <div class="stat-value">{stats.get('validated_objects', 0)}</div>
+                <div class="stat-label">검증됨</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            with col1:
-                if st.button("✅ Validate", key=f"validate_{idx}", type="primary"):
-                    if validate_object(
-                        object_id,
-                        filters["reviewer_name"],
-                        filters["default_quality"],
-                    ):
-                        st.success("Validated!")
-                        st.rerun()
-                    else:
-                        st.error("Failed to validate")
+        # Progress
+        total = stats.get("objects", 0)
+        validated = stats.get("validated_objects", 0)
+        if total > 0:
+            st.progress(validated / total)
+            st.caption(f"{validated/total*100:.1f}% 완료")
 
-            with col2:
-                if st.button("❌ Reject", key=f"reject_{idx}", type="secondary"):
-                    if reject_object(object_id):
-                        st.warning("Rejected and deleted")
-                        st.rerun()
-                    else:
-                        st.error("Failed to reject")
+        st.markdown("---")
+
+        # View Options
+        st.markdown('<div class="panel-header">👁️ 보기 설정</div>', unsafe_allow_html=True)
+        show_labels = st.checkbox("라벨 표시", value=True, key="show_labels_cb")
+        show_bboxes = st.checkbox("바운딩박스 표시", value=True, key="show_bboxes_cb")
+
+        st.markdown("---")
+
+        # Filters
+        st.markdown('<div class="panel-header">🔍 필터</div>', unsafe_allow_html=True)
+
+        validation_filter = st.radio(
+            "검증 상태",
+            ["전체", "미검증", "검증완료"],
+            index=1,
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        is_validated = None
+        if validation_filter == "미검증":
+            is_validated = False
+        elif validation_filter == "검증완료":
+            is_validated = True
+
+        category_names = ["전체"] + [c.get("name", "") for c in categories if c.get("name")]
+        selected_category = st.selectbox("카테고리", category_names, label_visibility="collapsed")
+        category = None if selected_category == "전체" else selected_category
+
+        st.markdown("---")
+
+        # Settings
+        st.markdown('<div class="panel-header">⚙️ 설정</div>', unsafe_allow_html=True)
+        reviewer_name = st.text_input("검토자", value="reviewer", label_visibility="collapsed",
+                                       placeholder="검토자 이름")
+        default_quality = st.slider("기본 품질 점수", 0.0, 1.0, 0.9, 0.05)
+
+        st.markdown("---")
+
+        # Keyboard Shortcuts
+        st.markdown('<div class="panel-header">⌨️ 단축키</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="font-size: 0.8rem; color: #6B6B6B;">
+            <div style="margin-bottom: 4px;"><span class="kbd">D</span> 다음 이미지</div>
+            <div style="margin-bottom: 4px;"><span class="kbd">A</span> 이전 이미지</div>
+            <div style="margin-bottom: 4px;"><span class="kbd">V</span> 검증</div>
+            <div style="margin-bottom: 4px;"><span class="kbd">X</span> 거부</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        return {
+            "is_validated": is_validated,
+            "category": category,
+            "reviewer_name": reviewer_name,
+            "default_quality": default_quality,
+            "show_labels": show_labels,
+            "show_bboxes": show_bboxes,
+        }
 
 
-def render_main_content(filters: dict):
-    """Render main content area."""
-    st.title("Object Validation")
-
-    # Get objects
-    objects = get_objects(
-        is_validated=filters["is_validated"],
-        category=filters["category"],
-        limit=50,
-    )
+def render_object_list(objects: list, selected_idx: Optional[int]) -> Optional[int]:
+    """Render right panel object list."""
+    st.markdown('<div class="panel-header">📋 객체 목록</div>', unsafe_allow_html=True)
 
     if not objects:
-        st.info("No objects found matching the filters.")
+        st.markdown("""
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>객체가 없습니다</p>
+        </div>
+        """, unsafe_allow_html=True)
+        return None
+
+    new_selected = selected_idx
+
+    for idx, obj in enumerate(objects):
+        category = obj.get("category_name", "unknown")
+        confidence = obj.get("confidence", 0) or 0
+        is_validated = obj.get("is_validated", False)
+        object_id = obj.get("object_id", "")[:8]
+
+        selected_class = "selected" if idx == selected_idx else ""
+        validated_class = "validated" if is_validated else ""
+
+        col1, col2, col3 = st.columns([0.5, 3, 1])
+
+        with col1:
+            if st.checkbox("", value=(idx == selected_idx), key=f"obj_select_{idx}",
+                          label_visibility="collapsed"):
+                new_selected = idx
+
+        with col2:
+            status = "✓" if is_validated else "○"
+            st.markdown(f"**{status} {category}**")
+            st.caption(f"ID: {object_id}...")
+
+        with col3:
+            st.markdown(f"""
+            <div class="object-confidence">{confidence:.0%}</div>
+            """, unsafe_allow_html=True)
+
+    return new_selected
+
+
+def render_label_editor(obj: Optional[dict], filters: dict) -> tuple:
+    """Render label editor panel."""
+    st.markdown('<div class="panel-header">🏷️ 라벨 편집</div>', unsafe_allow_html=True)
+
+    if not obj:
+        st.markdown("""
+        <div class="info-box">
+            왼쪽 목록에서 객체를 선택하세요
+        </div>
+        """, unsafe_allow_html=True)
+        return None, None
+
+    object_id = obj.get("object_id", "")
+    category = obj.get("category_name", "unknown")
+    confidence = obj.get("confidence", 0) or 0
+    is_validated = obj.get("is_validated", False)
+    bbox = (obj.get("bbox_x", 0), obj.get("bbox_y", 0),
+            obj.get("bbox_w", 0), obj.get("bbox_h", 0))
+
+    # Object Info
+    st.markdown(f"**ID:** `{object_id[:16]}...`")
+
+    st.markdown('<div class="label-field-label">카테고리</div>', unsafe_allow_html=True)
+    st.text_input("", value=category, disabled=True, key="cat_display", label_visibility="collapsed")
+
+    st.markdown('<div class="label-field-label">신뢰도</div>', unsafe_allow_html=True)
+    st.progress(confidence)
+    st.caption(f"{confidence:.1%}")
+
+    st.markdown('<div class="label-field-label">바운딩박스</div>', unsafe_allow_html=True)
+    st.code(f"x:{bbox[0]:.0f} y:{bbox[1]:.0f} w:{bbox[2]:.0f} h:{bbox[3]:.0f}")
+
+    st.markdown('<div class="label-field-label">상태</div>', unsafe_allow_html=True)
+    if is_validated:
+        st.markdown('<span class="badge badge-success">✓ 검증됨</span>', unsafe_allow_html=True)
+    else:
+        st.markdown('<span class="badge badge-warning">⏳ 대기중</span>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # Action Buttons
+    validate_clicked = False
+    reject_clicked = False
+
+    if not is_validated:
+        if st.button("✓ 검증하기", key="validate_btn", use_container_width=True, type="primary"):
+            validate_clicked = True
+
+        if st.button("✗ 거부하기", key="reject_btn", use_container_width=True):
+            reject_clicked = True
+    else:
+        st.success("이 객체는 검증되었습니다")
+
+    return validate_clicked, reject_clicked
+
+
+def render_canvas(source: Optional[dict], objects: list, selected_idx: Optional[int],
+                  show_labels: bool, show_bboxes: bool):
+    """Render main canvas area."""
+
+    if not source:
+        st.markdown("""
+        <div class="canvas-container">
+            <div class="empty-state">
+                <div class="empty-icon">🖼️</div>
+                <p>이미지를 선택하세요</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
-    st.write(f"Showing {len(objects)} objects")
+    # Try to load actual image
+    source_id = source.get("source_id", "")
+    image = load_source_image(source_id)
 
-    # Display in grid
-    cols = st.columns(3)
-    for idx, obj in enumerate(objects):
-        with cols[idx % 3]:
-            render_object_card(obj, filters, idx)
+    if not image:
+        width = source.get("width", 800)
+        height = source.get("height", 600)
+        image = create_placeholder_image(width, height, "이미지를 로드할 수 없습니다")
+
+    # Draw annotations
+    annotated_image = draw_annotations(image, objects, selected_idx, show_labels, show_bboxes)
+
+    # Display
+    st.image(annotated_image, use_container_width=True)
 
 
-def render_export_tab():
-    """Render dataset export tab."""
-    st.title("📦 Dataset Export")
+# ==================== Main Views ====================
+
+def annotation_view():
+    """Main annotation view with X-AnyLabeling layout."""
+    stats = get_stats()
+    categories = get_categories()
+
+    # Top toolbar
+    render_toolbar(stats)
+
+    # Left sidebar (filters and settings)
+    filters = render_left_sidebar(stats, categories)
+
+    # Get sources for navigation
+    sources = get_sources(limit=100)
+
+    # Main content area
+    if not sources:
+        st.markdown("""
+        <div class="canvas-container">
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <p>등록된 소스가 없습니다</p>
+                <p style="font-size: 0.875rem; margin-top: 8px;">
+                    Gateway API를 통해 이미지를 업로드하세요
+                </p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # Source selector
+    source_options = {
+        f"{s.get('file_path', '').split('/')[-1]} ({s.get('source_type', 'image')})": s
+        for s in sources
+    }
+
+    col_nav1, col_nav2, col_nav3 = st.columns([1, 6, 1])
+    with col_nav1:
+        if st.button("◀ 이전", use_container_width=True):
+            if st.session_state.current_image_idx > 0:
+                st.session_state.current_image_idx -= 1
+                st.session_state.selected_object_idx = None
+                st.rerun()
+
+    with col_nav2:
+        selected_source_name = st.selectbox(
+            "소스 선택",
+            list(source_options.keys()),
+            index=min(st.session_state.current_image_idx, len(source_options) - 1),
+            label_visibility="collapsed"
+        )
+        current_source = source_options.get(selected_source_name)
+
+    with col_nav3:
+        if st.button("다음 ▶", use_container_width=True):
+            if st.session_state.current_image_idx < len(sources) - 1:
+                st.session_state.current_image_idx += 1
+                st.session_state.selected_object_idx = None
+                st.rerun()
+
+    # Get objects for current source
+    if current_source:
+        source_id = current_source.get("source_id", "")
+        objects = get_objects_by_source(source_id)
+    else:
+        objects = []
+
+    # Three-column layout: Object List | Canvas | Label Editor
+    col_left, col_center, col_right = st.columns([2, 5, 2])
+
+    with col_left:
+        selected_idx = render_object_list(objects, st.session_state.selected_object_idx)
+        if selected_idx != st.session_state.selected_object_idx:
+            st.session_state.selected_object_idx = selected_idx
+            st.rerun()
+
+    with col_center:
+        render_canvas(
+            current_source,
+            objects,
+            st.session_state.selected_object_idx,
+            filters["show_labels"],
+            filters["show_bboxes"]
+        )
+
+    with col_right:
+        selected_obj = objects[st.session_state.selected_object_idx] if (
+            st.session_state.selected_object_idx is not None and
+            st.session_state.selected_object_idx < len(objects)
+        ) else None
+
+        validate_clicked, reject_clicked = render_label_editor(selected_obj, filters)
+
+        if validate_clicked and selected_obj:
+            object_id = selected_obj.get("object_id", "")
+            if validate_object(object_id, filters["reviewer_name"], filters["default_quality"]):
+                st.success("검증 완료!")
+                st.cache_data.clear()
+                st.rerun()
+
+        if reject_clicked and selected_obj:
+            object_id = selected_obj.get("object_id", "")
+            if reject_object(object_id):
+                st.warning("객체가 삭제되었습니다")
+                st.session_state.selected_object_idx = None
+                st.cache_data.clear()
+                st.rerun()
+
+    # Status bar
+    render_status_bar(current_source, objects, st.session_state.current_image_idx)
+
+
+def export_view():
+    """Dataset export view."""
+    st.markdown("## 📦 데이터셋 내보내기")
+    st.caption("검증된 데이터를 YOLO 또는 COCO 형식으로 내보냅니다")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        dataset_name = st.text_input("Dataset Name", value="my_dataset")
-        export_format = st.selectbox("Format", ["YOLO", "COCO"])
+        st.markdown('<div class="label-editor">', unsafe_allow_html=True)
+        st.markdown("### 설정")
 
-        # Split ratios
-        st.subheader("Split Ratios")
+        dataset_name = st.text_input("데이터셋 이름", value="my_dataset")
+        export_format = st.selectbox("형식", ["YOLO", "COCO"])
+
+        st.markdown("#### 분할 비율")
         train_ratio = st.slider("Train", 0.0, 1.0, 0.8, 0.05)
         val_ratio = st.slider("Validation", 0.0, 1.0, 0.1, 0.05)
         test_ratio = 1.0 - train_ratio - val_ratio
-        st.write(f"Test: {test_ratio:.2f}")
+        st.metric("Test", f"{test_ratio:.0%}")
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        # Filters
-        st.subheader("Filters")
-        only_validated = st.checkbox("Only Validated Objects", value=True)
+        st.markdown('<div class="label-editor">', unsafe_allow_html=True)
+        st.markdown("### 필터")
+
+        only_validated = st.checkbox("검증된 객체만", value=True)
+        min_confidence = st.slider("최소 신뢰도", 0.0, 1.0, 0.5, 0.05)
 
         categories = get_categories()
-        selected_cats = st.multiselect(
-            "Categories",
-            [c["name"] for c in categories],
-            default=[c["name"] for c in categories],
-        )
+        cat_names = [c.get("name", "") for c in categories if c.get("name")]
+        selected_cats = st.multiselect("카테고리", cat_names, default=cat_names)
 
-        min_confidence = st.slider("Min Confidence", 0.0, 1.0, 0.5, 0.05)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("🚀 Export Dataset", type="primary"):
-        with st.spinner("Exporting..."):
+    st.markdown("---")
+
+    if st.button("🚀 내보내기 시작", use_container_width=True, type="primary"):
+        with st.spinner("내보내는 중..."):
             try:
-                filter_config = {
-                    "categories": selected_cats,
-                    "min_confidence": min_confidence,
-                }
-                if only_validated:
-                    filter_config["is_validated"] = True
-
                 resp = httpx.post(
                     f"{GATEWAY_URL}/export",
                     data={
@@ -651,7 +1069,7 @@ def render_export_tab():
 
                 if result.get("success"):
                     data = result.get("data", {}).get("data", result.get("data", {}))
-                    st.success(f"Export completed!")
+                    st.success("✓ 내보내기 완료!")
                     st.json({
                         "dataset_name": data.get("dataset_name"),
                         "format": export_format,
@@ -660,278 +1078,106 @@ def render_export_tab():
                         "splits": data.get("splits"),
                     })
                 else:
-                    st.error(f"Export failed: {result.get('error')}")
+                    st.error(f"내보내기 실패: {result.get('error')}")
             except Exception as e:
-                st.error(f"Export error: {e}")
+                st.error(f"오류: {e}")
 
 
-def render_stats_tab():
-    """Render statistics dashboard."""
-    st.title("📊 Statistics Dashboard")
+def stats_view():
+    """Statistics dashboard view."""
+    st.markdown("## 📊 통계 대시보드")
 
     stats = get_stats()
 
     if not stats:
-        st.warning("Unable to load statistics")
+        st.markdown("""
+        <div class="error-container">
+            <strong>⚠️ 연결 오류</strong><br>
+            Registry 서비스에 연결할 수 없습니다
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     # Overview metrics
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Objects", stats.get("objects", 0))
-    col2.metric("Validated", stats.get("validated_objects", 0))
-    col3.metric("Categories", stats.get("categories", 0))
-    col4.metric("Sources", stats.get("sources", 0))
 
-    # Validation progress
+    with col1:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-value">📦 {stats.get('objects', 0)}</div>
+            <div class="stat-label">전체 객체</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-value">✓ {stats.get('validated_objects', 0)}</div>
+            <div class="stat-label">검증 완료</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-value">🏷️ {stats.get('categories', 0)}</div>
+            <div class="stat-label">카테고리</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-value">📁 {stats.get('sources', 0)}</div>
+            <div class="stat-label">소스</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # Progress
     total = stats.get("objects", 0)
     validated = stats.get("validated_objects", 0)
     if total > 0:
-        progress = validated / total
-        st.progress(progress, text=f"Validation Progress: {validated}/{total} ({progress*100:.1f}%)")
+        st.markdown("### 검증 진행률")
+        st.progress(validated / total)
+        st.caption(f"{validated}/{total} 객체 검증됨 ({validated/total*100:.1f}%)")
+
+    st.markdown("---")
 
     # Category distribution
-    st.subheader("Objects per Category")
+    st.markdown("### 카테고리별 객체 수")
     category_counts = stats.get("objects_per_category", {})
     if category_counts:
         df = pd.DataFrame([
-            {"Category": k, "Count": v}
+            {"카테고리": k, "객체 수": v}
             for k, v in category_counts.items()
         ])
-        st.bar_chart(df.set_index("Category"))
-
-
-def render_tracks_tab():
-    """Render track visualization tab."""
-    st.title("🎯 Track Visualization")
-
-    # Get available sources
-    stats = get_stats()
-
-    # Source selector
-    st.subheader("Select Source")
-    source_id = st.text_input(
-        "Source ID",
-        placeholder="Enter source ID (e.g., src_abc123)",
-        help="Enter the source ID for which you want to visualize tracks",
-    )
-
-    if not source_id:
-        st.info("Enter a source ID to view tracks. Sources with video content typically have tracks.")
-
-        # Show some instructions
-        st.markdown("""
-        ### How to use Track Visualization
-
-        1. **Enter Source ID**: Enter the source ID of a video that has been processed with tracking
-        2. **View Trajectories**: See object trajectories across frames
-        3. **Timeline View**: Understand when each track appears in the video
-        4. **Track Details**: Inspect individual track statistics
-
-        ### Track Colors
-        Each track is assigned a unique color for easy identification.
-        The trajectory shows the center point movement of each tracked object.
-        """)
-        return
-
-    # Get source info
-    source = get_source(source_id)
-    if not source:
-        st.error(f"Source not found: {source_id}")
-        return
-
-    # Display source info
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Type", source.get("source_type", "unknown"))
-    col2.metric("Width", source.get("width", 0))
-    col3.metric("Height", source.get("height", 0))
-    col4.metric("Frames", source.get("frame_count", 0))
-
-    st.divider()
-
-    # Get tracks for this source
-    with st.spinner("Loading tracks..."):
-        tracks = get_tracks_for_source(source_id)
-
-    if not tracks:
-        st.warning("No tracks found for this source. Make sure tracking has been run on this video.")
-
-        # Show objects without tracks
-        objects = search_objects_by_source(source_id, limit=50)
-        if objects:
-            st.info(f"Found {len(objects)} objects without track assignments.")
-        return
-
-    # Track overview
-    st.subheader(f"Found {len(tracks)} Tracks")
-
-    # Track selection
-    track_options = [
-        f"{t['track_id'][:16]}... - {t.get('category', 'unknown')} ({t.get('length', 0)} objects)"
-        for t in tracks
-    ]
-    selected_tracks = st.multiselect(
-        "Select tracks to highlight",
-        options=range(len(tracks)),
-        format_func=lambda x: track_options[x],
-        default=list(range(min(5, len(tracks)))),  # Select first 5 by default
-    )
-
-    selected_track_ids = [tracks[i]["track_id"] for i in selected_tracks] if selected_tracks else None
-
-    # Visualization options
-    col1, col2 = st.columns(2)
-    with col1:
-        show_all = st.checkbox("Show all tracks (unselected in gray)", value=True)
-    with col2:
-        show_timeline = st.checkbox("Show timeline view", value=True)
-
-    # Create main visualization
-    st.subheader("Trajectory View")
-    width = source.get("width", 1280)
-    height = source.get("height", 720)
-
-    # Scale down for display if too large
-    max_display_width = 1200
-    scale = min(1.0, max_display_width / width)
-    display_width = int(width * scale)
-    display_height = int(height * scale)
-
-    # Create scaled tracks for visualization
-    scaled_tracks = []
-    for track in tracks:
-        scaled_track = {
-            "track_id": track["track_id"],
-            "category": track.get("category"),
-            "objects": [],
-        }
-        for obj in track.get("objects", []):
-            scaled_obj = {
-                "bbox_x": obj.get("bbox_x", 0) * scale,
-                "bbox_y": obj.get("bbox_y", 0) * scale,
-                "bbox_w": obj.get("bbox_w", 0) * scale,
-                "bbox_h": obj.get("bbox_h", 0) * scale,
-                "frame_id": obj.get("frame_id"),
-            }
-            scaled_track["objects"].append(scaled_obj)
-        scaled_tracks.append(scaled_track)
-
-    track_img = create_track_visualization(
-        display_width,
-        display_height,
-        scaled_tracks,
-        selected_track_ids=selected_track_ids,
-        show_all_tracks=show_all,
-    )
-    st.image(track_img, use_container_width=True)
-
-    # Timeline view
-    if show_timeline:
-        st.subheader("Timeline View")
-        total_frames = source.get("frame_count", 100)
-        timeline_height = min(400, max(150, len(tracks) * 30 + 40))
-        timeline_img = create_track_timeline(tracks, total_frames, width=1000, height=timeline_height)
-        st.image(timeline_img, use_container_width=True)
-
-    # Track details table
-    st.subheader("Track Details")
-    track_data = []
-    for idx, track in enumerate(tracks):
-        objects = track.get("objects", [])
-        confidences = [obj.get("confidence", 0) for obj in objects if obj.get("confidence")]
-
-        # Get frame range
-        frame_ids = []
-        for obj in objects:
-            frame_id = obj.get("frame_id", "")
-            try:
-                if frame_id.startswith("frame_"):
-                    frame_num = int(frame_id.split("_")[1])
-                else:
-                    frame_num = int(frame_id) if frame_id else 0
-                frame_ids.append(frame_num)
-            except (ValueError, IndexError):
-                pass
-
-        track_data.append({
-            "Color": TRACK_COLORS[idx % len(TRACK_COLORS)],
-            "Track ID": track["track_id"][:20] + "...",
-            "Category": track.get("category", "unknown"),
-            "Objects": len(objects),
-            "Start Frame": min(frame_ids) if frame_ids else "-",
-            "End Frame": max(frame_ids) if frame_ids else "-",
-            "Duration": max(frame_ids) - min(frame_ids) + 1 if frame_ids else 0,
-            "Avg Confidence": f"{sum(confidences)/len(confidences):.2f}" if confidences else "-",
-        })
-
-    df = pd.DataFrame(track_data)
-
-    # Style the dataframe with track colors
-    def color_row(row):
-        color = row["Color"]
-        return [f"background-color: {color}20" for _ in row]
-
-    styled_df = df.style.apply(color_row, axis=1)
-    st.dataframe(styled_df, use_container_width=True, hide_index=True)
-
-    # Individual track inspection
-    st.subheader("Inspect Track")
-    if selected_tracks:
-        selected_idx = st.selectbox(
-            "Select a track to inspect",
-            options=selected_tracks,
-            format_func=lambda x: track_options[x],
-        )
-
-        if selected_idx is not None:
-            track = tracks[selected_idx]
-            objects = track.get("objects", [])
-
-            st.markdown(f"**Track ID:** `{track['track_id']}`")
-            st.markdown(f"**Category:** {track.get('category', 'unknown')}")
-            st.markdown(f"**Number of detections:** {len(objects)}")
-
-            # Show object details
-            if st.checkbox("Show object details", value=False):
-                obj_data = []
-                for obj in objects:
-                    obj_data.append({
-                        "Object ID": obj.get("object_id", "")[:16] + "...",
-                        "Frame": obj.get("frame_id", ""),
-                        "X": f"{obj.get('bbox_x', 0):.1f}",
-                        "Y": f"{obj.get('bbox_y', 0):.1f}",
-                        "W": f"{obj.get('bbox_w', 0):.1f}",
-                        "H": f"{obj.get('bbox_h', 0):.1f}",
-                        "Confidence": f"{obj.get('confidence', 0):.2f}" if obj.get('confidence') else "-",
-                    })
-                st.dataframe(pd.DataFrame(obj_data), use_container_width=True, hide_index=True)
+        st.bar_chart(df.set_index("카테고리"))
+    else:
+        st.info("카테고리 데이터가 없습니다")
 
 
 # ==================== Main App ====================
 
 def main():
-    """Main application."""
-    # Sidebar
-    filters = render_sidebar()
+    """Main application with tabbed navigation."""
 
-    # Main tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🏷️ Validation",
-        "🎯 Tracks",
-        "📦 Export",
-        "📊 Statistics",
+    # Tab navigation
+    tab1, tab2, tab3 = st.tabs([
+        "🏷️ 주석 편집",
+        "📦 내보내기",
+        "📊 통계",
     ])
 
     with tab1:
-        render_main_content(filters)
+        annotation_view()
 
     with tab2:
-        render_tracks_tab()
+        export_view()
 
     with tab3:
-        render_export_tab()
-
-    with tab4:
-        render_stats_tab()
+        stats_view()
 
 
 if __name__ == "__main__":

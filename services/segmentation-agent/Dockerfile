@@ -2,19 +2,20 @@ FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/segmentation-agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY packages /packages
 ENV PYTHONPATH=/packages:$PYTHONPATH
 
-COPY app /app
+COPY services/segmentation-agent/app /app
 
 HEALTHCHECK --interval=30s --timeout=10s \
     CMD curl -f http://localhost:8000/health || exit 1
