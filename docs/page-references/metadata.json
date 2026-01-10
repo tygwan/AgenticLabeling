@@ -1,0 +1,5 @@
+{
+  "name": "Agentic Labeling Studio",
+  "description": "An AI-powered agentic labeling workspace using Gemini 2.5 and Spline 3D visualization to analyze images and videos for object detection and dataset curation.",
+  "requestFramePermissions": []
+}
