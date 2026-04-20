@@ -26,11 +26,15 @@ const API = {
     if (!r.ok) throw new Error(`upload failed: ${r.status}`);
     return r.json();
   },
-  async exportDataset({ datasetName, exportFormat, onlyValidated }) {
+  async exportDataset({ datasetName, exportFormat, onlyValidated, splits }) {
     const form = new FormData();
     form.append('dataset_name', datasetName || 'mvp-dataset');
     form.append('export_format', exportFormat || 'yolo');
     form.append('only_validated', onlyValidated ? 'True' : 'False');
+    const s = splits || { train: 80, val: 15, test: 5 };
+    form.append('split_train', String(s.train));
+    form.append('split_val', String(s.val));
+    form.append('split_test', String(s.test));
     const r = await fetch('/api/export', { method: 'POST', body: form });
     if (!r.ok) throw new Error(`export failed: ${r.status}`);
     return r.json();

@@ -54,6 +54,25 @@ CREATE TABLE IF NOT EXISTS objects (
 CREATE INDEX IF NOT EXISTS idx_objects_source_id ON objects(source_id);
 CREATE INDEX IF NOT EXISTS idx_objects_category_id ON objects(category_id);
 CREATE INDEX IF NOT EXISTS idx_objects_is_validated ON objects(is_validated);
+
+CREATE TABLE IF NOT EXISTS runs (
+    run_id TEXT PRIMARY KEY,
+    project_id TEXT,
+    source_id TEXT,
+    status TEXT NOT NULL DEFAULT 'running',
+    source_count INTEGER DEFAULT 1,
+    classes TEXT,
+    detection_backend TEXT,
+    segmentation_backend TEXT,
+    detections INTEGER,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP,
+    duration_ms INTEGER,
+    error TEXT,
+    FOREIGN KEY (source_id) REFERENCES sources(source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_runs_project_id ON runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
 """
 
 

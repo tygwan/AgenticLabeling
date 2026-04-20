@@ -30,6 +30,7 @@ const ExportScreen = ({ workspace }) => {
     try {
       const result = await API.exportDataset({
         datasetName, exportFormat: format, onlyValidated: filterValidated,
+        splits,
       });
       setLastExport(result);
     } catch (e) {

@@ -203,9 +203,71 @@ class Registry:
                 "SELECT COUNT(*) FROM objects WHERE is_validated = 1"
             ).fetchone()[0],
             "categories": conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0],
+            "runs": conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0],
         }
         conn.close()
         return stats
+
+    def start_run(
+        self,
+        *,
+        project_id: str,
+        classes: list[str],
+        detection_backend: str = "florence2",
+        segmentation_backend: str = "sam3",
+    ) -> str:
+        """Record the start of an auto-label pipeline run. Returns run_id."""
+        run_id = f"run_{uuid.uuid4().hex[:12]}"
+        conn = get_conn()
+        conn.execute(
+            """INSERT INTO runs
+               (run_id, project_id, status, classes, detection_backend, segmentation_backend)
+               VALUES (?, ?, 'running', ?, ?, ?)""",
+            (run_id, project_id, ",".join(classes or []), detection_backend, segmentation_backend),
+        )
+        conn.commit()
+        conn.close()
+        return run_id
+
+    def finish_run(
+        self,
+        run_id: str,
+        *,
+        status: str,
+        source_id: Optional[str] = None,
+        detections: Optional[int] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """Mark a run finished (status='completed' | 'failed') with metadata."""
+        conn = get_conn()
+        conn.execute(
+            """UPDATE runs
+               SET status = ?,
+                   source_id = COALESCE(?, source_id),
+                   detections = COALESCE(?, detections),
+                   error = ?,
+                   finished_at = CURRENT_TIMESTAMP,
+                   duration_ms = CAST((julianday('now') - julianday(started_at)) * 86400000 AS INTEGER)
+               WHERE run_id = ?""",
+            (status, source_id, detections, error, run_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def list_runs(self, limit: int = 20, project_id: Optional[str] = None) -> list[dict]:
+        conn = get_conn()
+        if project_id:
+            rows = conn.execute(
+                "SELECT * FROM runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?",
+                (project_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM runs ORDER BY started_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
 
     def export_dataset(
         self,
@@ -213,6 +275,7 @@ class Registry:
         dataset_name: str,
         export_format: str,
         only_validated: bool = True,
+        split_ratios: Optional[dict] = None,
     ) -> ExportResult:
         settings = get_settings()
         objects = self.list_objects(is_validated=True if only_validated else None)
@@ -235,7 +298,7 @@ class Registry:
                 (dataset_dir / split).mkdir(parents=True, exist_ok=True)
 
         source_ids = list(grouped.keys())
-        splits = self._split_sources(source_ids)
+        splits = self._split_sources(source_ids, ratios=split_ratios)
         image_count = 0
         object_count = 0
 
@@ -262,14 +325,48 @@ class Registry:
             object_count=object_count,
         )
 
-    def _split_sources(self, source_ids: list[str]) -> dict[str, list[str]]:
+    def _split_sources(
+        self,
+        source_ids: list[str],
+        *,
+        ratios: Optional[dict] = None,
+    ) -> dict[str, list[str]]:
+        """Split source_ids into train/val/test buckets.
+
+        `ratios` accepts values in either percent (summing to ~100) or fraction
+        (summing to ~1.0). Missing keys default to train=80, val=15, test=5.
+        Ordering is deterministic (insertion order of grouped[*]). val+test
+        floors are computed first so train absorbs rounding leftover.
+        """
         total = len(source_ids)
-        train_end = max(1, int(total * 0.8)) if total else 0
-        val_end = min(total, train_end + int(total * 0.1))
+        if total == 0:
+            return {"train": [], "val": [], "test": []}
+
+        raw = ratios or {}
+        train_r = float(raw.get("train", 80))
+        val_r = float(raw.get("val", 15))
+        test_r = float(raw.get("test", 5))
+        # Normalize so they sum to 1.0 regardless of percent/fraction input
+        tot_r = train_r + val_r + test_r
+        if tot_r <= 0:
+            train_r, val_r, test_r, tot_r = 80.0, 15.0, 5.0, 100.0
+        train_f = train_r / tot_r
+        val_f = val_r / tot_r
+
+        val_count = int(total * val_f)
+        train_count = max(1, int(total * train_f))
+        # Ensure sum never exceeds total.
+        if train_count + val_count > total:
+            train_count = max(1, total - val_count)
+        test_count = total - train_count - val_count
+        if test_count < 0:
+            test_count = 0
+            train_count = total - val_count
+
         return {
-            "train": source_ids[:train_end],
-            "val": source_ids[train_end:val_end],
-            "test": source_ids[val_end:],
+            "train": source_ids[:train_count],
+            "val": source_ids[train_count:train_count + val_count],
+            "test": source_ids[train_count + val_count:train_count + val_count + test_count],
         }
 
     def _copy_source_asset(self, source: dict, target: Path) -> None:

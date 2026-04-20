@@ -166,47 +166,68 @@ async def run_auto_label(
     image_bytes = await image.read()
     class_list = [c.strip() for c in classes.split(",") if c.strip()]
 
-    stored_path = store_image_bytes(image.filename or f"{uuid4().hex}.jpg", image_bytes)
-    with Image.open(stored_path).convert("RGB") as img:
-        width, height = img.width, img.height
-
-    detection = detector.detect(image_bytes, class_list)
-    raw_boxes = detection.get("boxes", [])
-    labels = detection.get("labels", [])
-    scores = detection.get("scores", [])
-
-    segmentation = segmenter.segment(image_bytes, raw_boxes) if raw_boxes else {"masks": []}
-    masks = segmentation.get("masks", [])
-
-    source_id = registry.register_source(
+    run_id = registry.start_run(
         project_id=project_id,
-        file_path=str(stored_path.resolve()),
-        file_name=stored_path.name,
-        width=width,
-        height=height,
+        classes=class_list,
+        detection_backend="florence2",
+        segmentation_backend=segmenter.backend_name,
     )
 
-    objects_data = []
-    for idx, raw_box in enumerate(raw_boxes):
-        xywh = _xyxy_to_xywh(raw_box, width, height)
-        objects_data.append(
-            {
-                "category": labels[idx] if idx < len(labels) else "object",
-                "bbox": xywh,
-                "confidence": scores[idx] if idx < len(scores) else None,
-                "detection_model": "florence2",
-                "mask_base64": masks[idx]["mask"] if idx < len(masks) else None,
-            }
+    try:
+        stored_path = store_image_bytes(image.filename or f"{uuid4().hex}.jpg", image_bytes)
+        with Image.open(stored_path).convert("RGB") as img:
+            width, height = img.width, img.height
+
+        detection = detector.detect(image_bytes, class_list)
+        raw_boxes = detection.get("boxes", [])
+        labels = detection.get("labels", [])
+        scores = detection.get("scores", [])
+
+        segmentation = segmenter.segment(image_bytes, raw_boxes) if raw_boxes else {"masks": []}
+        masks = segmentation.get("masks", [])
+
+        source_id = registry.register_source(
+            project_id=project_id,
+            file_path=str(stored_path.resolve()),
+            file_name=stored_path.name,
+            width=width,
+            height=height,
         )
-    object_ids = registry.register_objects_batch(source_id, objects_data) if objects_data else []
-    return {
-        "success": True,
-        "source_id": source_id,
-        "object_ids": object_ids,
-        "detections": len(object_ids),
-        "file_name": stored_path.name,
-        "segmentation_backend": segmenter.backend_name,
-    }
+
+        objects_data = []
+        for idx, raw_box in enumerate(raw_boxes):
+            xywh = _xyxy_to_xywh(raw_box, width, height)
+            objects_data.append(
+                {
+                    "category": labels[idx] if idx < len(labels) else "object",
+                    "bbox": xywh,
+                    "confidence": scores[idx] if idx < len(scores) else None,
+                    "detection_model": "florence2",
+                    "mask_base64": masks[idx]["mask"] if idx < len(masks) else None,
+                }
+            )
+        object_ids = registry.register_objects_batch(source_id, objects_data) if objects_data else []
+
+        registry.finish_run(run_id, status="completed", source_id=source_id, detections=len(object_ids))
+
+        return {
+            "success": True,
+            "run_id": run_id,
+            "source_id": source_id,
+            "object_ids": object_ids,
+            "detections": len(object_ids),
+            "file_name": stored_path.name,
+            "segmentation_backend": segmenter.backend_name,
+        }
+    except Exception as exc:
+        registry.finish_run(run_id, status="failed", error=str(exc)[:500])
+        raise
+
+
+@app.get("/api/runs")
+def api_runs(limit: int = 20, project_id: Optional[str] = None) -> dict:
+    runs = registry.list_runs(limit=limit, project_id=project_id)
+    return {"success": True, "data": runs}
 
 
 @app.get("/api/review/sources")
@@ -289,11 +310,15 @@ def api_export(
     dataset_name: str = Form("mvp-dataset"),
     export_format: str = Form("yolo"),
     only_validated: bool = Form(True),
+    split_train: float = Form(80.0),
+    split_val: float = Form(15.0),
+    split_test: float = Form(5.0),
 ) -> dict:
     result = registry.export_dataset(
         dataset_name=dataset_name,
         export_format=export_format.lower(),
         only_validated=only_validated,
+        split_ratios={"train": split_train, "val": split_val, "test": split_test},
     )
     return {
         "success": True,
@@ -302,6 +327,7 @@ def api_export(
         "image_count": result.image_count,
         "object_count": result.object_count,
         "download_url": f"/api/export/download/{result.zip_path.name}",
+        "splits": {"train": split_train, "val": split_val, "test": split_test},
     }
 
 
@@ -433,4 +459,5 @@ def api_workspace() -> dict:
         "stats": stats,
         "category_colors": CATEGORY_COLORS,
         "segmentation_backend": segmenter.backend_name,
+        "recent_runs": registry.list_runs(limit=10),
     }

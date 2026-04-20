@@ -127,26 +127,32 @@ const HomeScreen = ({ onGoReview, onRunPipeline, workspace }) => {
       <section className="runs-card">
         <div className="card-head">
           <h3 className="card-title sm">Recent runs</h3>
-          <button className="btn ghost sm">View all <IconChevRight size={12} /></button>
         </div>
         <div className="run-table">
           <div className="run-head">
-            <span>Run</span><span>Project</span><span>Sources</span><span>Duration</span><span>Status</span>
+            <span>Run</span><span>Project</span><span>Detections</span><span>Duration</span><span>Status</span>
           </div>
-          {RECENT_RUNS.map(r => (
-            <div key={r.id} className="run-row">
-              <span className="mono">{r.id}</span>
-              <span>{r.project}</span>
-              <span>{r.source_count}</span>
-              <span>{r.duration}</span>
-              <span>
-                {r.status === 'running'
-                  ? <span className="running-pill"><IconSpinner size={10} /> running · {Math.round(r.progress*100)}%</span>
-                  : <StatusPill status={r.status} />
-                }
-              </span>
+          {(workspace?.recent_runs || []).length === 0 ? (
+            <div className="run-row" style={{ color: 'var(--c-muted)' }}>
+              <span colSpan={5} style={{ gridColumn: '1 / -1' }}>No runs yet — upload an image to run the pipeline.</span>
             </div>
-          ))}
+          ) : (workspace.recent_runs || []).map(r => {
+            const dur = r.duration_ms != null ? (r.duration_ms > 1000 ? `${(r.duration_ms / 1000).toFixed(1)}s` : `${r.duration_ms}ms`) : '—';
+            return (
+              <div key={r.run_id} className="run-row" title={r.error || ''}>
+                <span className="mono">{r.run_id}</span>
+                <span>{r.project_id || 'default'}</span>
+                <span>{r.detections ?? '—'}</span>
+                <span>{dur}</span>
+                <span>
+                  {r.status === 'running'
+                    ? <span className="running-pill"><IconSpinner size={10} /> running</span>
+                    : <StatusPill status={r.status === 'completed' ? 'validated' : (r.status === 'failed' ? 'failed' : r.status)} />
+                  }
+                </span>
+              </div>
+            );
+          })}
         </div>
       </section>
 
