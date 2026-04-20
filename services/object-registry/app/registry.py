@@ -198,6 +198,34 @@ class ObjectRegistry:
         conn.close()
         return dict(row) if row else None
 
+    def list_sources(
+        self,
+        source_type: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[dict]:
+        """List sources with optional filters."""
+        conn = self._get_conn()
+
+        query = "SELECT * FROM sources"
+        params = []
+        conditions = []
+
+        if source_type:
+            conditions.append("source_type = ?")
+            params.append(source_type)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
     # ==================== Category Management ====================
 
     def get_or_create_category(

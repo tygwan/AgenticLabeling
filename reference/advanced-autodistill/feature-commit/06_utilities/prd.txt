@@ -1,0 +1,279 @@
+**Here is the translated Final PRD (v3.0 - Complete):**
+
+**Final PRD: High-Accuracy/High-Efficiency Image Labeling and Classification Optimization based on Autodistill (v3.0 - Complete)**
+
+**# Overview**
+
+This project aims to solve the time and cost issues inherent in labor-intensive image/video data labeling processes. In particular, achieving near 100% accuracy in labeling large-scale datasets is a critical prerequisite for training high-quality Vision AI models, but manual work is inefficient. The core of the project involves utilizing Autodistill technology, which combines an LLM (Florence-2) and SAM2 (Segment Anything Model 2), to proactively and rapidly collect box and mask information for target objects and preprocess annotation information for each class based on this. While the initial accuracy of Autodistill may be low, this project aims to compare and evaluate **four image classification methodologies (Cosine Similarity, Cosine Similarity + Feedback Loop, VLM, VLM + Feedback Loop)** based on it, with the ultimate goal of finding the image classification and refinement method that exhibits the highest performance and efficiency defectos for training vision models.
+
+This solution targets data labeling teams, AI researchers, and all developers who need to build accurate training datasets quickly. It will contribute to dramatically reducing labeling time and cost and accelerating the development of high-quality Vision AI models. The entire process will be **partially controlled 사용자-friendly through an MCP (Model Control Panel, tentative name)**, and notably, the free benefits of the Google Gemini 2.5 Pro API will be actively utilized for the Feedback Loop and VLM evaluation. All project outcomes (accuracy, time taken, improvement process, prompt engineering, etc.) will be meticulously recorded and documented in a structure defectos for use in the feedback loop.
+
+**# Core Features**
+
+1.  **Automated Object Information Collection and Preprocessing Module based on Autodistill (Florence-2 + SAM2)**
+    *   **What it does:**
+        *   Takes user-defined `caption ontology` (label: caption format) and original images as input.
+        *   The Florence-2 model (selectable from base, large, base-ft, large-ft) embeds the image and the text of the `caption ontology` to extract box information for target objects from the image based on the text.
+        *   The extracted box information is used as a box prompt for the SAM2 model (selectable from sam2hiera{tiny, small, base_plus, large}, sam2.1_hiera{tiny, small, base_plus, large}) to generate mask information for the object.
+        *   The generated box and mask coordinate values are saved in `.txt` and `.json` files respectively, in the format defined by Florence-2 and SAM2 (Folders: `3.box`, `4.mask`).
+        *   The original image is preprocessed using the saved box and mask coordinate values. The preprocessing steps are as follows:
+            1.  Crop the image from the original image according to the box coordinates.
+            2.  In the cropped image, black out the background area excluding the mask coordinate area.
+            3.  Resize the image to a specified size (e.g., 224x224) while maintaining the object's aspect ratio.
+            4.  The preprocessed image is saved in the `5.preprocessed-img` folder.
+        *   It is recognized that the preprocessed image may have a black background with only the object's mask information visible, and subsequent processing modules will consider this.
+    *   **Why it's important:** It significantly reduces time and effort by automating the initial stages of manual labeling and provides consistent base data for subsequent classification and refinement tasks. Offering various model selection options enhances flexibility.
+    *   **How it works at a high level:** Florence-2's text-image matching capability finds object candidates, and SAM2's sophisticated segmentation capability generates masks, which are then used to create standardized input images.
+    *   **Considerations:** Thorough analysis of the internal logic and data processing methods of Autodistill-related Python packages (grounded sam2, florence-2, autodistill, etc.) is required, along with code modification/wrapping for stable integration if necessary. Compatibility issues due to package version changes should also be noted.
+
+2.  **Category-Based Flexible Data Management System**
+    *   **What it does:** All data (original images, support set, box/mask coordinates, preprocessed images, classification results, etc.) are managed within a folder structure organized by user-defined "categories." Users can easily switch categories via the MCP and flexibly specify the original image folder (`1.input`) and support set folder (`2.support-set`) for each category.
+    *   **Why it's important:** It enhances storage management efficiency when dealing with large-scale data and facilitates data separation and reuse across various projects or experiments.
+    *   **How it works at a high level:** Folders named after categories are created under the main project root (`/home/ml/project-agi`), and standardized subfolders (`1.input`, `2.support-set`, etc.) are placed within them. The MCP recognizes the currently active category and dynamically sets the relevant paths.
+
+3.  **Method 1: Image Classification based on Autodistill + Cosine Similarity**
+    *   **What it does:** Classifies preprocessed images from the `5.preprocessed-img` folder by calculating Cosine Similarity with example images (support set, **acting as initial Ground Truth provided by the user**) from the `2.support-set` folder. The class order in `caption ontology` and `support-set` must match.
+    *   **Why it's important:** It evaluates the performance of a simple and quickly implementable image similarity-based classification method and establishes an initial baseline accuracy.
+    *   **How it works at a high level:** Feature vectors are extracted from both support set images and preprocessed images. Cosine similarity is calculated between these feature vectors, and the preprocessed image is classified into the class of the support set image with the highest similarity.
+    *   **Support Set Utilization Strategy:** Experiments are conducted by parameterizing the number of support set images (K-shot: 1, 5, 10, 30, etc., selectable in MCP) and the similarity threshold (selectable in MCP).
+    *   **Feature Extractor:**
+        *   **Selection Goal:** To select a model that is robust to various images (simple, complex, partially visible objects, preprocessed images with removed backgrounds) and can particularly capture the morphological/semantic features of preprocessed images 남아있는 with only mask information.
+        *   **Candidates and Strategy:**
+            1.  **CLIP (Contrastive Language-Image Pre-training):** Can consider both the textual information of the `caption ontology` and the visual features of the preprocessed image, as it embeds images and text into the same space. Potential to capture not only the morphological features of preprocessed images but also semantic similarity like "this is the appearance of [class_name]."
+            2.  **DINOv2 (Self-Distillation with No Labels v2):** Trained without labels, making it robust to diverse visual features, and its expressive power for detailed object shapes and textures might be defectos for mask-based images.
+            3.  (Auxiliary) ResNet-50: Used as a comparison group based on past experience.
+        *   **Selection Method:** Conduct initial experiments with the above candidates, and select the final model by analyzing the embedding distribution for various preprocessed images and evaluating based on Ground Truth (support set), or provide a strategy in MCP to combine/select models depending on the situation.
+
+4.  **Method 2: Image Classification based on Autodistill + Cosine Similarity + Feedback Loop**
+    *   **What it does:** An iterative process that improves the Cosine Similarity classification logic (e.g., updating the support set, adjusting feature space weights, changing embedding aggregation methods) by receiving user feedback via MCP (e.g., correcting support set, modifying classification results, **excluding ambiguous or strange images**) on the results of Method 1, and then reclassifies.
+    *   **Why it's important:** It progressively corrects initial classification errors, guides the implicit learning of the model to continuously improve accuracy, clarifies the direction of improvement using Ground Truth, and reflects user intuition in the system.
+    *   **How it works at a high level:** When the user inputs feedback via MCP, the system interprets it to update the support set or adjust parameters affecting the feature extraction/comparison logic. Reclassification is then performed based on the changed settings.
+    *   **Feedback Loop Logic (Cosine Similarity):**
+        *   User feedback (e.g., specifying misclassified images - "Image A is actually class X", adding/excluding support set images, **flagging an image as "unclassifiable" or "noise"**) is collected via MCP.
+        *   **Embedding Strategy Involvement:** When adding support set images, the **embedding aggregation method (e.g., averaging embedding vectors of all support set images for a representative vector, or using the max/average of individual similarities to each support set image embedding) will be selectable in MCP**, and this strategy can be changed based on feedback. (e.g., if a specific class's support set becomes diverse, a k-NN approach might be more advantageous than averaging).
+        *   **Handling Ambiguous or Strange Images:** Images designated by the user via MCP as "unclassifiable" or "noise" are excluded from the next classification target or processed as a separate "unclassified" class to avoid affecting other classes. For cases where an object is visible even if the box is too small or the mask is inaccurate, **user judgment is prioritized** over simple size/accuracy filtering. The list of these excluded images and reasons are recorded for future analysis.
+        *   **Parameter Version Management:** Parameters changed due to feedback (K-shot value, similarity threshold, support set composition, embedding aggregation method, etc.) are **managed as a new "experiment version."** The MCP supports loading and applying parameter sets corresponding to specific feedback sessions or experiment versions to ensure the reproducibility of previous experimental results.
+
+5.  **Method 3: Image Classification based on Autodistill + VLM (Florence-2)**
+    *   **What it does:** Directly classifies preprocessed images from the `5.preprocessed-img` folder into classes defined in the `caption ontology` using Florence-2 VLM capabilities.
+    *   **Why it's important:** Aims to achieve high accuracy by leveraging the powerful image understanding and zero-shot/few-shot classification capabilities of modern VLMs.
+    *   **How it works at a high level:** Preprocessed images are provided as input to the Florence-2 VLM, and it is prompted to classify them into the most appropriate class by referencing each "label: caption" in the `caption ontology`.
+
+6.  **Method 4: Image Classification based on Autodistill + VLM + Feedback Loop**
+    *   **What it does:** An iterative process that improves the VLM's prompts or classification strategy by receiving user feedback via MCP on the results of Method 3, and then reclassifies. The Gemini 2.5 Pro API (free) is utilized as the LLM for feedback processing and prompt improvement.
+    *   **Why it's important:** It corrects potential errors of the VLM, continuously optimizes model performance, guides clear improvements using Ground Truth, and attempts exploratory improvements for data where the ground truth is unknown.
+    *   **How it works at a high level:** When the user inputs feedback via MCP, an LLM (such as Gemini 2.5 Pro) analyzes this feedback to modify the prompt to be delivered to the Florence-2 VLM or adjust other parameters affecting classification decisions. Reclassification is then performed based on the changed settings.
+    *   **Feedback Loop Logic (VLM - Utilizing Gemini 2.5 Pro):**
+        *   **Input Data Preparation (for Gemini):**
+            *   **User Feedback:** Structured feedback collected via MCP (e.g., `{"image_id": "img_001.png", "feedback_type": "relabel", "previous_vlm_class": "cat", "corrected_class": "dog", "user_reason": "Ear shape and tail are characteristic of a dog"}` or `{"image_id": "img_002.png", "feedback_type": "flag_noise", "user_reason": "Object is unclear"}`).
+            *   **Relevant Image Information:** Path to the feedback target image or Base64 encoded data, (if necessary) Autodistill box/mask information for that image.
+            *   **Current VLM Prompt:** The prompt template currently in use for the Florence-2 VLM.
+            *   **Caption Ontology:** The currently used class definitions.
+            *   **(Optional) Key Statistics from Previous Cycle:** Information about frequent confusion between specific classes, etc.
+        *   **Gemini's Role (Prompt Engineering):**
+            1.  **Feedback Analysis and Understanding:** Ascertain the intent and content of the provided feedback.
+            2.  **Improvement Strategy Formulation:**
+                *   **Misclassification Correction:** Generate a prompt for Florence-2 including specific instructions like, "This image should be classified as [new class], not [previous class], because [user reason]. In the next classification, please pay more attention to the features of [new class] (e.g., [caption ontology content] or [features mentioned by user])."
+                *   **Handling Ambiguous Images:** Generate guidelines like, "This image was identified as noise by the user. In the next classification, please assign low confidence to images with similar features or process them as 'unclassified'."
+                *   **`caption ontology` Modification Suggestion:** If feedback suggests ambiguity or inaccuracy in a specific class definition, Gemini proposes modifications to the caption in the `caption ontology` or suggests adding examples (presented to the user via MCP for confirmation).
+            3.  **Florence-2 Prompt Generation/Modification:** Modify existing prompts or generate new, context-appropriate prompts based on the analysis results.
+        *   **Impact of `caption ontology` Modification and Parameter Version Management:** Modifying the `caption ontology` changes the object detection results of Autodistill itself, which may mean re-running the entire pipeline. If `caption ontology` modification is proposed in the feedback loop, its ripple effects (e.g., changes in the total number of annotations) must be carefully considered, and **applied after clearly informing the user of the scope of change**. It is recognized that an "absolute increase in the number of annotations" may not necessarily mean successful feedback (e.g., increased noise). Changed parameters are managed as a new "experiment version."
+
+7.  **Comprehensive Result Analysis, Reporting, and Feedback System Integration**
+    *   **What it does:**
+        *   For each of the 4 methodologies, detailed records and comparative analysis of classification accuracy (Balanced Accuracy, Macro F1-score, Fall-out, MCC, etc., based on TP, TN, FP, FN, including options to consider class imbalance), classification time, step-by-step improvement process of the feedback loop, and evolution of prompt engineering are performed.
+        *   All classification results must be traceable to see how they moved from the original Autodistill results, and visualized via Confusion Matrix (binary, multi-class).
+        *   The raw output of the Confusion Matrix (TP, TN, FP, FN values) is saved in a format defectos for use in the feedback loop.
+        *   All results are documented, and this documentation has a structure that can be used as input for the feedback loop again (e.g., an LLM analyzes it to suggest improvement directions).
+        *   Metadata for preprocessed images is reorganized and saved according to each classification method's annotation information, enabling evaluation at each stage (Autodistill accuracy, accuracy of the 4 classification methods, evaluation of YOLO models trained with this improved annotation information).
+        *   **Ground Truth Utilization and Cycle-by-Cycle Change Tracking:** The initial Support Set is considered part of the Ground Truth, and as each feedback cycle progresses, it tracks and records how the classification result of a specific image (e.g., image A, misclassified in cycle 1) changes to become closer to the Ground Truth.
+        *   **Clustering Change Analysis:** After each cycle, it visualizes and quantitatively evaluates (e.g., silhouette coefficient) how much more densely or well-separated images classified into the same class become in the feature space (based on the selected feature extractor).
+    *   **Why it's important:** It clearly identifies the pros and cons of each methodology, selects the "highest performance and highest efficiency" method most defectos for the data characteristics and project goals, and supports data-driven decision-making for continuous improvement. Detailed recording without information loss ensures reproducibility and in-depth analysis.
+    *   **How it works at a high level:** Standardized reports are generated by integrating logs, classification result files, Confusion Matrix data, etc., generated after each methodology execution. These reports are viewable via MCP, and specific data are automatically/manually linked as input for the next feedback cycle.
+    *   **Data Storage Format (Considering Dashboards and Visualization):**
+        *   **Experiment Results and Logs:** **Apache Parquet** format is used as the default. Columnar storage provides excellent analytical query performance, good compatibility with Pandas and Spark, and high compression ratios, making it defectos for large-scale data.
+        *   **Data for Real-time/Updatable Dashboards in MCP:** Periodically read Parquet files and store summary/aggregated data in an in-memory cache (e.g., Redis) or a lightweight DB (e.g., SQLite) to quickly provide data to the dashboard. Alternatively, tools like Streamlit/Dash can be supported to read Parquet files directly to construct updatable dashboards.
+        *   **Image Metadata and Feedback:** Consider JSON Lines or a document-oriented DB like MongoDB to support flexible schemas and complex nested data storage.
+    *   **Comprehensive Data Logging for Monitoring:** To accurately judge the effectiveness of the feedback loop, **all input parameters, intermediate output paths, model versions used, generated logs, user feedback content, system environment information, etc., are meticulously recorded** for each cycle/experiment version. This record is directly/indirectly reflected in the next feedback loop.
+
+**# User Experience (MCP-centric)**
+
+*   **User Personas:**
+    *   AI Researcher/Developer: Primary user who experiments, evaluates, and optimizes new labeling and classification methodologies.
+    *   Data Manager: Responsible for category-based management of large-scale datasets and operation of the preprocessing pipeline.
+*   **Key User Flows (Performed via MCP):**
+    1.  **Project/Category Setup:**
+        *   Create a new category or select an existing one.
+        *   Specify paths for `1.input` and `2.support-set` folders for the category.
+        *   Input/modify `caption ontology` (list of label: caption).
+        *   Select Florence-2 and SAM2 model versions for Autodistill.
+    2.  **Autodistill Execution and Preprocessing:**
+        *   Command Autodistill execution with configured settings.
+        *   Verify generation results of `3.box`, `4.mask`, `5.preprocessed-img`.
+    3.  **Classification Methodology Execution and Parameter Adjustment:**
+        *   Select and execute one or more of the 4 methodologies.
+        *   (Methods 1, 2) Select feature extractor model and embedding aggregation method, set K-shot value, similarity threshold.
+        *   (Methods 2, 4) Configure Feedback Loop related settings (LLM model selection, etc. - Gemini 2.5 Pro default).
+    4.  **Result Verification and Analysis:**
+        *   View reports for classification accuracy, Confusion Matrix, time taken, etc., for each methodology.
+        *   Verify classified image samples.
+    5.  **Feedback Loop Execution (Methods 2, 4):**
+        *   Input feedback on classification results (e.g., correct class of a specific image, add/remove new support images, modify `caption ontology`, flag ambiguous or strange images).
+        *   Execute reclassification based on feedback.
+    6.  **YOLO Training Dataset Generation:**
+        *   Convert refined annotation information to YOLO format and output.
+    7.  **Accuracy Issue Logging and Comprehensive Evaluation (MCP Integration):**
+        *   Verify outputs (images, coordinates, classification results, etc.) of each processing stage (Autodistill, classification methodologies 1-4) in MCP.
+        *   Users can select **standardized issue types and record additional explanations (text, numbers, etc.)** for specific images or results via MCP.
+        *   These records are aggregated and presented in a "Comprehensive Evaluation" dashboard format, based on which users decide on parameter adjustments or project direction modifications for the next feedback loop.
+        *   **Misclassified Image Selection and Feature Logging:** During the feedback loop process, if a user selects a misclassified image via MCP and leaves comments on its visual features or reasons for misclassification, this information is structured and used as input for LLM (Gemini) analysis in the next loop.
+        *   **Flagging Ambiguous or Strange Images:** Users can designate specific images in the MCP image viewer with standardized tags like "Unclassifiable/Noise," "Background Only," "Box/Mask Inaccurate but Object Visible," and this information is saved as metadata for that image to be used in the feedback loop and final analysis.
+    8.  **Experiment Version Management and Parameter Set Load/Save:** MCP supports saving a snapshot of all relevant parameters (Autodistill model version, K-shot, threshold, feature extractor model, embedding aggregation method, VLM prompt template, etc.) that have changed due to feedback loops or manual modifications as an "experiment version," and allows selecting a specific version to consistently load and apply settings across the entire system.
+    9.  **Dashboard Viewing:**
+        *   **Real-time/Updatable Dashboard:** Visually check summary statistics of ongoing classification tasks, status of recent feedback application, key performance indicators (accuracy change 대비 Ground Truth, clustering metric changes, etc.).
+        *   **User Confidence Score Input (Optional Large-Scale Evaluation):** Since it's difficult for all users to evaluate confidence for a vast number of images, MCP provides a feature to **request confidence evaluation only for a sampled set of images** or to **request focused evaluation only for specific "ambiguous" images**. These results are aggregated and displayed on the dashboard.
+*   **UI/UX Considerations (MCP):**
+    *   Provide an intuitive and user-friendly experience with a web-based interface.
+    *   Clearly distinguish settings and execution buttons for each step.
+    *   Visually display progress (progress bars, log output).
+    *   Embed result reports (tables, charts, image viewer).
+    *   Support set image upload/management function.
+    *   `caption ontology` editor.
+    *   Save and load all setting values function (linked with experiment version management).
+
+**# Technical Architecture**
+
+*   **System Components:**
+    *   **MCP (Model Control Panel):** User interface and backend API based on a web framework (Python FastAPI/Flask + React/Vue.js or Streamlit/Gradio).
+    *   **Autodistill Module:**
+        *   Florence-2 (Hugging Face Transformers library, local model files).
+        *   SAM2 (Hugging Face Transformers or official library, local model files).
+        *   Script location: `/home/ml/project-agi/scripts/autodistill_runner.py` (tentative)
+    *   **Data Management Module:** Category-based folder creation/management, file I/O processing.
+    *   **Preprocessing Module:** Utilizing OpenCV, PIL. (`/home/ml/project-agi/scripts/preprocessor.py`)
+    *   **Classification Modules (per methodology):**
+        *   **Cosine Similarity:** Scikit-learn, selected feature extractor (CLIP, DINOv2, etc.). (`/home/ml/project-agi/scripts/classifier_cosine.py`)
+        *   **VLM (Florence-2):** Direct call to Florence-2 VLM capabilities. (`/home/ml/project-agi/scripts/classifier_vlm.py`)
+    *   **Feedback Loop Module:**
+        *   Feedback data storage (JSON Lines or MongoDB).
+        *   Feedback interpretation and setting change logic (Utilizing LLM - Gemini 2.5 Pro API).
+        *   `/home/ml/project-agi/scripts/feedback_handler.py`
+    *   **Result Analysis and Reporting Module:** Pandas, Matplotlib, Scikit-learn (metrics), HTML/Parquet generation. (`/home/ml/project-agi/scripts/reporter.py`)
+    *   **YOLO Data Conversion Module:** (`/home/ml/project-agi/scripts/yolo_converter.py`)
+    *   **Experiment Version Management Module:** Parameter snapshot save/load. (`/home/ml/project-agi/scripts/version_control.py`)
+*   **Data Models:**
+    *   Original image/video data (user-provided).
+    *   `caption_ontology.json` (per category): `{"label_id": 0, "label_name": "apple", "caption": "a red apple"}, ...`
+    *   Box coordinate file (`.txt`): `[class_id_florence] x_center y_center width height` (follows Florence-2 output format)
+    *   Mask coordinate file (`.json`): SAM2 output format (segmentation polygon or RLE)
+    *   Preprocessed image file (e.g., `.png`, `.jpg`).
+    *   Classification result file (`classification_results_cycle_X.parquet`): `image_path, original_autodistill_class_id, method1_class_id, method1_score, ..., ground_truth_class_id (if available), experiment_version_id`
+    *   Feedback data file (JSON Lines or MongoDB collection): `{"image_id": "xyz.png", "feedback_type": "relabel", "old_class_id": 0, "new_class_id": 1, "user_comment": "...", "timestamp": "...", "experiment_version_id_source": "..."}`
+    *   Confusion Matrix raw data (`confusion_matrix_raw_cycle_X.parquet`): `class_id, TP, TN, FP, FN, experiment_version_id`
+    *   Accuracy issue log data (`problem_log.parquet` or MongoDB collection): `timestamp, category_id, image_id, process_stage, problem_type_code, user_description, system_generated_metrics_json, user_severity_rating, feedback_cycle_id, experiment_version_id`
+    *   Experiment version management data (`experiment_versions.json` or lightweight DB): `version_id, timestamp, base_version_id, parameter_snapshot_json, description, associated_feedback_ids`
+*   **APIs and Integrations:**
+    *   Google Gemini 2.5 Pro API (for Feedback Loop, prompt engineering support).
+    *   (Internal) MCP backend API - for communication with the frontend.
+*   **Infrastructure Requirements:**
+    *   Python 3.8+ execution environment.
+    *   GPU (NVIDIA, CUDA support) - Essential for running Florence-2, SAM2, and deep learning-based feature extractors.
+    *   Packages specified in `install_dependencies.sh` (or `requirements.txt`).
+    *   Sufficient storage space (for original data, model files, generated data).
+    *   (Recommended) Docker container environment (for reproducibility and ease of deployment).
+    *   Project root: `/home/ml/project-agi`
+
+**# Development Roadmap**
+
+*   **Phase 1: Foundation & Core Autodistill Setup (MVP-1)**
+    *   Design category-based folder structure and develop basic I/O utilities.
+    *   Build MCP basic framework (category setup, `caption ontology` input UI).
+    *   Implement Florence-2 model selection and box extraction functionality (scripted).
+    *   Implement SAM2 model selection and mask generation functionality based on box prompt (scripted).
+    *   Implement box/mask coordinate saving logic.
+    *   Implement image preprocessing module (crop, mask application, resize).
+    *   Verify initial execution of Autodistill pipeline and generation of results (preprocessed images).
+    *   **Define accuracy issue logging method and initial implementation:** Define standardized issue type codes, basic input interface in MCP, initial storage format (JSON Lines or Parquet).
+    *   Design basic concept for experiment version management and introduce manual logging method.
+*   **Phase 2: Baseline Classification & Initial Feedback Infrastructure (MVP-2)**
+    *   **Select and implement feature extractor (for Cosine Similarity):** Primary selection and integration from candidates like CLIP, DINOv2. UI for K-shot (1, 5, 10, 30) and similarity threshold settings (MCP), UI for embedding aggregation method selection (MCP).
+    *   Implement and evaluate Method 1 (Autodistill + Cosine Similarity) classifier.
+    *   Add Support Set management functionality to MCP (upload, class-specific designation).
+    *   Implement basic result reporting functionality (classification result table, simple accuracy metrics).
+    *   Build basic Feedback Loop infrastructure:
+        *   Prototype feedback data collection interface (in MCP, including misclassification correction, ambiguous image flagging).
+        *   Integrate Gemini 2.5 Pro API (simple feedback interpretation and logging).
+        *   Implement basic functionality for Method 2 (Cosine Similarity + Feedback Loop) (at the level of re-running after manually changing support set).
+        *   Prototype experiment version management module (parameter snapshot save/load).
+*   **Phase 3: Advanced VLM Integration & Comprehensive Evaluation Framework**
+    *   Implement and evaluate Method 3 (Autodistill + VLM - Florence-2) classifier.
+    *   Implement basic functionality for Method 4 (VLM + Feedback Loop) (prompt suggestion/modification utilizing Gemini 2.5 Pro).
+    *   Develop comprehensive result analysis framework:
+        *   Logic for integrating and comparing results of the 4 methodologies.
+        *   Generation and visualization of Confusion Matrix (including saving TP, TN, FP, FN raw data).
+        *   Calculation of various evaluation metrics like Balanced Accuracy, Macro F1-score.
+        *   Functionality for tracking changes 대비 Ground Truth, clustering analysis.
+    *   Implement YOLO dataset conversion functionality.
+    *   Design a structured documentation system for all results and logs (applying efficient formats like Parquet).
+*   **Phase 4: Feedback Loop Enhancement & MCP Completion**
+    *   **Enhance feedback reflection logic (Cosine Similarity & VLM):** Develop automated logic utilizing Gemini 2.5 Pro to comprehensively analyze user feedback (including misclassified image feature logs, ambiguous image flags), Confusion Matrix results, issue logs, etc., and automatically suggest/apply specific setting changes (e.g., automatic support set suggestions, feature weight fine-tuning, dynamic VLM prompt generation, embedding aggregation method recommendations).
+    *   Specify and apply Feedback Loop strategy for cases where Ground Truth is unknown (utilizing consistency, clustering, user confidence, LLM relative evaluation metrics).
+    *   Complete MCP functionality: Improve user experience, detailed log viewer, advanced analysis features, dashboard (real-time/updatable), user confidence score input interface (sampling-based), complete experiment version management UI/UX.
+    *   Automated final report generation functionality.
+*   **Future Enhancements:**
+    *   Support for additional diverse LLM/VLM models.
+    *   Introduction of Active Learning techniques.
+    *   Real-time collaborative labeling feature (MCP extension).
+
+**# Logical Dependency Chain**
+
+1.  **Environment Setup & Basic I/O (Foundation):** Python environment, GPU drivers, essential library installation. Category-based folder management logic. Basic design for experiment version management.
+2.  **Autodistill Pipeline Construction (Core Engine):** Florence-2 integration -> SAM2 integration -> Coordinate saving -> Image preprocessing, developed sequentially. Model selection and execution control via MCP.
+3.  **Cosine Similarity Classification (Baseline):** Feature extractor implementation/integration -> Support Set management -> Cosine Similarity calculation and classification. (Requires Autodistill results)
+4.  **VLM Classification (Alternative Baseline):** Classification utilizing Florence-2 VLM capabilities. (Requires Autodistill results)
+5.  **Result Analysis Framework (Evaluation Core):** Aggregation of each classification result, calculation of evaluation metrics, Confusion Matrix generation, Ground Truth change tracking, clustering analysis. (Requires results from each classification methodology)
+6.  **Feedback Loop Infrastructure (Iteration Core):** Feedback collection (MCP) -> Feedback processing (Gemini API) -> Setting reflection. Integration with experiment version management module. (Requires each classification methodology and result analysis framework)
+7.  **Feedback Loop Application (Methods 2, 4):** Integrate Feedback Loop infrastructure into each classification method.
+8.  **MCP Feature Expansion (Usability):** Continuously add relevant UI/UX to MCP in parallel with each module development. Dashboard, issue logging, experiment version management interface, etc.
+9.  **YOLO Conversion & Final Reporting (Output):** Generation of final deliverables after all refinement and analysis are complete.
+
+**# Risks and Mitigations**
+
+*   **Technical Challenges:**
+    *   **Autodistill Accuracy Variability:** Initial accuracy fluctuation depending on the selected Florence-2/SAM2 models and `caption ontology` quality.
+        *   **Mitigation:** Test various model combinations, provide `caption ontology` writing guidelines, progressive improvement through Feedback Loop.
+    *   **Feature Extractor Performance:** The selected feature extractor may not show consistent high performance for diverse images and preprocessed mask images.
+        *   **Mitigation:** Thorough experimentation and comparative evaluation of multiple candidates (CLIP, DINOv2, etc.) followed by optimal model selection or a combination strategy. Provide selection options in MCP.
+    *   **Feedback Loop Logic Complexity and Unpredictability:** Difficulty in developing logic to effectively interpret user feedback and reflect it in system settings. Changes due to feedback do not always guarantee positive results. `caption ontology` changes, in particular, have significant ripple effects.
+        *   **Mitigation:** Utilize the strong language understanding capabilities of Gemini 2.5 Pro, implement features stepwise (initially: simple rule-based -> gradually to LLM-based intelligent), sufficient testing. Simulation or small-scale data testing before changes, clear rollback mechanism for changes (utilizing experiment version management), clearly state the scope of change impact to the user.
+    *   **Difficulty in Evaluation without Ground Truth (Partially Resolved):** While the initial Support Set is used as Ground Truth, evaluation for large-scale unknown data can still be indirect.
+        *   **Mitigation:** Utilize multifaceted metrics like consistency, clustering, user confidence, LLM relative evaluation. Parallel manual verification based on sampling.
+    *   **Package Dependency and Stability:** Unexpected behavior due to updates or internal logic changes in Autodistill-related external packages.
+        *   **Mitigation:** Use fixed stable versions of packages, write own test code for major functionalities, monitor package change logs.
+*   **Resource Constraints:**
+    *   **GPU Resources:** GPU memory and computation time shortage when running multiple models simultaneously and processing large-scale data.
+        *   **Mitigation:** Use efficient models, batch processing, code optimization, utilize cloud GPU if necessary.
+    *   **API Costs (Other than Gemini):** Cost management when using other paid APIs.
+        *   **Mitigation:** Maximize utilization of Gemini 2.5 Pro, logic to minimize API calls, cost monitoring.
+*   **Scope Creep:**
+    *   **Excessive MCP Features:** Development scope expansion due to continuous addition of MCP features for user convenience.
+        *   **Mitigation:** Define stepwise MVPs, prioritize core feature development, prioritize additional features.
+*   **Data Dependency:**
+    *   **Support Set Quality:** The Cosine Similarity method heavily depends on the quality of the Support Set.
+        *   **Mitigation:** Provide easy Support Set management and update functionality via MCP, guide Support Set improvement through Feedback Loop.
+
+**# Appendix**
+
+*   **Florence-2 Model Information:** (Hugging Face link, paper link)
+*   **SAM2 Model Information:** (Hugging Face link, paper link)
+*   **CLIP Model Information:** (Hugging Face link, paper link)
+*   **DINOv2 Model Information:** (Hugging Face link, paper link)
+*   **Gemini 2.5 Pro API Documentation Link.**
+*   **`install_dependencies.sh` / `requirements.txt` (Draft)**
+*   **Initial `caption_ontology.json` Example.**
+*   **Reference Papers and Materials:** (Research on Cosine Similarity classification, VLM-based classification, Feedback Loop, feature extractors)
+*   **Standardized Issue Type Code Definition Document (Draft).**
+
+---
+
+This completes the English translation of the Final PRD. I hope this serves as a solid foundation for your project!

@@ -1,6 +1,8 @@
-"""SAM2 segmenter implementation with lazy loading."""
+"""SAM3 segmenter implementation with lazy loading (legacy service)."""
 import base64
 import io
+import os
+import sys
 from typing import List, Optional
 
 import numpy as np
@@ -8,11 +10,11 @@ import torch
 from PIL import Image
 
 
-class SAM2Segmenter:
-    """SAM2 based segmenter with singleton pattern."""
+class SAM3Segmenter:
+    """SAM3 based segmenter with singleton pattern."""
 
-    _instance: Optional["SAM2Segmenter"] = None
-    _predictor = None
+    _instance: Optional["SAM3Segmenter"] = None
+    _processor = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -22,106 +24,72 @@ class SAM2Segmenter:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def _ensure_loaded(self):
-        """Lazy load model on first use."""
-        if self._predictor is None:
-            import os
-            from sam2.build_sam import build_sam2
-            from sam2.sam2_image_predictor import SAM2ImagePredictor
+    @staticmethod
+    def _xyxy_to_cxcywh_norm(box: List[float], width: int, height: int) -> List[float]:
+        x1, y1, x2, y2 = box
+        return [
+            (x1 + x2) / 2.0 / width,
+            (y1 + y2) / 2.0 / height,
+            (x2 - x1) / width,
+            (y2 - y1) / height,
+        ]
 
-            checkpoint = os.path.expanduser(
-                "~/.cache/autodistill/segment_anything_2/sam2_hiera_base_plus.pt"
+    def _ensure_loaded(self):
+        if self._processor is None:
+            vendor_sam3 = os.path.join(os.getcwd(), "vendor", "sam3")
+            if os.path.isdir(vendor_sam3) and vendor_sam3 not in sys.path:
+                sys.path.insert(0, vendor_sam3)
+
+            from sam3 import build_sam3_image_model
+            from sam3.model.sam3_image_processor import Sam3Processor
+
+            model = build_sam3_image_model(
+                device=str(self.device),
+                eval_mode=True,
+                enable_inst_interactivity=False,
+                enable_segmentation=True,
             )
-            model_cfg = "configs/sam2/sam2_hiera_b+.yaml"
-            sam2_model = build_sam2(model_cfg, checkpoint, device=self.device)
-            self._predictor = SAM2ImagePredictor(sam2_model)
+            self._processor = Sam3Processor(
+                model, device=str(self.device), confidence_threshold=0.3,
+            )
 
     def segment(
         self,
         image_bytes: bytes,
         boxes: List[List[float]],
     ) -> dict:
-        """Segment objects using bounding boxes.
-
-        Args:
-            image_bytes: Raw image bytes
-            boxes: List of bounding boxes [[x1,y1,x2,y2], ...]
-
-        Returns:
-            Dict with masks as base64 encoded PNGs
-        """
         self._ensure_loaded()
 
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        image_np = np.array(image)
-
         masks_data = []
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-            self._predictor.set_image(image_np)
+        state = self._processor.set_image(image)
 
-            for box in boxes:
-                masks, scores, _ = self._predictor.predict(
-                    box=np.array(box),
-                    multimask_output=False,
-                )
-                best_idx = np.argmax(scores)
-                mask = masks[best_idx].astype(np.uint8) * 255
-
-                # Encode mask as base64 PNG
-                mask_img = Image.fromarray(mask)
+        for box in boxes:
+            self._processor.reset_all_prompts(state)
+            box_norm = self._xyxy_to_cxcywh_norm(box, image.width, image.height)
+            state = self._processor.add_geometric_prompt(
+                box=box_norm, label=True, state=state,
+            )
+            if "masks" in state and len(state["masks"]) > 0:
+                scores = state["scores"]
+                best_idx = int(scores.argmax())
+                mask_tensor = state["masks"][best_idx][0]
+                mask_np = mask_tensor.cpu().numpy().astype(np.uint8) * 255
                 buffer = io.BytesIO()
-                mask_img.save(buffer, format="PNG")
-                mask_b64 = base64.b64encode(buffer.getvalue()).decode()
+                Image.fromarray(mask_np).save(buffer, format="PNG")
                 masks_data.append({
-                    "mask": mask_b64,
+                    "mask": base64.b64encode(buffer.getvalue()).decode(),
                     "score": float(scores[best_idx]),
                 })
-
-        return {
-            "masks": masks_data,
-            "image_size": {"width": image.width, "height": image.height},
-        }
-
-    def segment_with_points(
-        self,
-        image_bytes: bytes,
-        points: List[List[float]],
-        labels: List[int],
-    ) -> dict:
-        """Segment using point prompts.
-
-        Args:
-            image_bytes: Raw image bytes
-            points: List of points [[x, y], ...]
-            labels: List of labels (1=foreground, 0=background)
-
-        Returns:
-            Dict with masks as base64 encoded PNGs
-        """
-        self._ensure_loaded()
-
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        image_np = np.array(image)
-
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-            self._predictor.set_image(image_np)
-
-            masks, scores, _ = self._predictor.predict(
-                point_coords=np.array(points),
-                point_labels=np.array(labels),
-                multimask_output=True,
-            )
-
-            masks_data = []
-            for i, (mask, score) in enumerate(zip(masks, scores)):
-                mask_uint8 = mask.astype(np.uint8) * 255
-                mask_img = Image.fromarray(mask_uint8)
+            else:
+                mask = np.zeros((image.height, image.width), dtype=np.uint8)
+                x1, y1, x2, y2 = [int(v) for v in box]
+                mask[max(0, y1):max(0, y2), max(0, x1):max(0, x2)] = 255
                 buffer = io.BytesIO()
-                mask_img.save(buffer, format="PNG")
-                mask_b64 = base64.b64encode(buffer.getvalue()).decode()
+                Image.fromarray(mask).save(buffer, format="PNG")
                 masks_data.append({
-                    "mask": mask_b64,
-                    "score": float(score),
+                    "mask": base64.b64encode(buffer.getvalue()).decode(),
+                    "score": 0.0,
                 })
 
         return {
@@ -130,8 +98,7 @@ class SAM2Segmenter:
         }
 
     def unload(self):
-        """Unload model to free GPU memory."""
-        if self._predictor is not None:
-            del self._predictor
-            self._predictor = None
+        if self._processor is not None:
+            del self._processor
+            self._processor = None
             torch.cuda.empty_cache()

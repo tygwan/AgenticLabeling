@@ -1,0 +1,31 @@
+FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app:/app/vendor/sam3
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-mvp.txt /app/requirements-mvp.txt
+RUN pip install --upgrade pip && pip install -r /app/requirements-mvp.txt
+
+COPY vendor/sam3 /app/vendor/sam3
+COPY mvp_app /app/mvp_app
+
+RUN mkdir -p /app/data/mvp /root/.cache/huggingface
+
+EXPOSE 8090
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8090/health || exit 1
+
+CMD ["uvicorn", "mvp_app.main:app", "--host", "0.0.0.0", "--port", "8090"]

@@ -1,0 +1,6 @@
+path: /home/coffin/dev/AgenticLabeling/data/mvp/exports/mvp-dataset
+train: train/images
+val: val/images
+test: test/images
+nc: 3
+names: ['car', 'cone', 'road']

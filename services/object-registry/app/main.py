@@ -124,6 +124,21 @@ async def health():
 
 # ==================== Sources ====================
 
+@app.get("/sources")
+async def list_sources(
+    source_type: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """List all sources with optional filters."""
+    sources = registry.list_sources(
+        source_type=source_type,
+        limit=limit,
+        offset=offset,
+    )
+    return {"success": True, "data": sources, "total": len(sources)}
+
+
 @app.post("/sources")
 async def create_source(source: SourceCreate):
     """Register a new source (image/video)."""

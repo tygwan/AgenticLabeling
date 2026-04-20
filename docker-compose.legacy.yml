@@ -1,0 +1,227 @@
+services:
+  gateway:
+    build: ./services/gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - DETECTION_URL=http://detection-agent:8001
+      - SEGMENTATION_URL=http://segmentation-agent:8002
+      - CLASSIFICATION_URL=http://classification-agent:8003
+      - LABELING_URL=http://labeling-agent:8004
+      - TRAINING_URL=http://training-agent:8005
+      - REGISTRY_URL=http://object-registry:8010
+      - DATA_MANAGER_URL=http://data-manager:8006
+    depends_on:
+      - redis
+      - object-registry
+      - data-manager
+    networks:
+      - internal
+
+  detection-agent:
+    build:
+      context: .
+      dockerfile: ./services/detection-agent/Dockerfile
+    ports:
+      - "8001:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./data:/data
+      - ./packages:/packages
+      - model-cache:/root/.cache
+    environment:
+      - PYTHONPATH=/packages
+    networks:
+      - internal
+
+  segmentation-agent:
+    build:
+      context: .
+      dockerfile: ./services/segmentation-agent/Dockerfile
+    ports:
+      - "8002:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./data:/data
+      - ./packages:/packages
+      - model-cache:/root/.cache
+    environment:
+      - PYTHONPATH=/packages
+    networks:
+      - internal
+
+  classification-agent:
+    build:
+      context: .
+      dockerfile: ./services/classification-agent/Dockerfile
+    ports:
+      - "8003:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./data:/data
+      - ./packages:/packages
+      - model-cache:/root/.cache
+    environment:
+      - PYTHONPATH=/packages
+    networks:
+      - internal
+
+  labeling-agent:
+    build: ./services/labeling-agent
+    ports:
+      - "8004:8000"
+    volumes:
+      - ./data:/data
+    networks:
+      - internal
+
+  training-agent:
+    build:
+      context: .
+      dockerfile: ./services/training-agent/Dockerfile
+    ports:
+      - "8005:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./data:/data
+      - ./packages:/packages
+      - model-cache:/root/.cache
+      - ./mlflow:/mlflow
+    environment:
+      - PYTHONPATH=/packages
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DATA_MANAGER_URL=http://data-manager:8006
+      - REGISTRY_URL=http://object-registry:8010
+    depends_on:
+      - data-manager
+      - object-registry
+      - mlflow
+    networks:
+      - internal
+
+  data-manager:
+    build: ./services/data-manager
+    ports:
+      - "8006:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - DATA_DIR=/data
+      - REGISTRY_URL=http://object-registry:8010
+    depends_on:
+      - object-registry
+    networks:
+      - internal
+
+  object-registry:
+    build: ./services/object-registry
+    ports:
+      - "8010:8000"
+    volumes:
+      - ./data/registry:/data
+    environment:
+      - DATA_DIR=/data
+    networks:
+      - internal
+
+  evaluation-agent:
+    build:
+      context: .
+      dockerfile: ./services/evaluation-agent/Dockerfile
+    ports:
+      - "8007:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./data:/data
+      - ./packages:/packages
+      - model-cache:/root/.cache
+    environment:
+      - PYTHONPATH=/packages
+    networks:
+      - internal
+
+  label-studio-lite:
+    build: ./services/label-studio-lite
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/data
+    environment:
+      - REGISTRY_URL=http://object-registry:8010
+      - GATEWAY_URL=http://gateway:8000
+      - DATA_DIR=/data
+    depends_on:
+      - object-registry
+      - gateway
+    networks:
+      - internal
+
+  preprocessing-agent:
+    build: ./services/preprocessing-agent
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./data:/data
+    environment:
+      - GATEWAY_URL=http://gateway:8000
+      - REGISTRY_URL=http://object-registry:8010
+      - DATA_DIR=/data/preprocessing
+    depends_on:
+      - gateway
+      - object-registry
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - internal
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.2
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow:/mlflow
+    command: mlflow server --host 0.0.0.0 --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    networks:
+      - internal
+
+volumes:
+  model-cache:
+
+networks:
+  internal:
+    driver: bridge

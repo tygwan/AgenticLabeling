@@ -1,0 +1,243 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": ".claude/hooks/pre-tool-use-safety.sh Bash"}]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [{"type": "command", "command": ".claude/hooks/pre-tool-use-safety.sh Write"}]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [{"type": "command", "command": ".claude/hooks/pre-tool-use-safety.sh Edit"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": ".claude/hooks/auto-doc-sync.sh Bash"},
+          {"type": "command", "command": ".claude/hooks/post-tool-use-tracker.sh Bash"}
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {"type": "command", "command": ".claude/hooks/auto-doc-sync.sh Write"},
+          {"type": "command", "command": ".claude/hooks/phase-progress.sh Write"},
+          {"type": "command", "command": ".claude/hooks/post-tool-use-tracker.sh Write"}
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {"type": "command", "command": ".claude/hooks/auto-doc-sync.sh Edit"},
+          {"type": "command", "command": ".claude/hooks/phase-progress.sh Edit"},
+          {"type": "command", "command": ".claude/hooks/post-tool-use-tracker.sh Edit"}
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [{"type": "command", "command": ".claude/hooks/notification-handler.sh"}]
+      }
+    ]
+  },
+  "agile": {
+    "auto_changelog": true,
+    "auto_readme_sync": true,
+    "sprint_tracking": true,
+    "velocity_tracking": true,
+    "sync_on_commit": true
+  },
+  "phase": {
+    "enabled": true,
+    "auto_progress_update": true,
+    "auto_check_completion": true,
+    "notify_on_completion": true,
+    "document_structure": {
+      "spec": "SPEC.md",
+      "tasks": "TASKS.md",
+      "checklist": "CHECKLIST.md"
+    },
+    "templates": {
+      "location": ".claude/templates/phase",
+      "spec_template": "SPEC.md",
+      "tasks_template": "TASKS.md",
+      "checklist_template": "CHECKLIST.md"
+    }
+  },
+  "sprint": {
+    "enabled": true,
+    "default_duration": "2w",
+    "point_scale": [1, 2, 3, 5, 8, 13],
+    "auto_velocity_track": true,
+    "auto_retro_generate": true,
+    "burndown_chart": "ascii",
+    "daily_reminder": false,
+    "phase_integration": {
+      "enabled": true,
+      "link_to_phase": true,
+      "auto_update_phase_tasks": true,
+      "pull_tasks_from_phase": true
+    }
+  },
+  "quality-gate": {
+    "pre-commit": {
+      "enabled": true,
+      "checks": ["lint", "format", "types", "secrets"],
+      "auto_fix": false
+    },
+    "pre-merge": {
+      "enabled": true,
+      "coverage_threshold": 80,
+      "require_review": true,
+      "require_changelog": true
+    },
+    "pre-release": {
+      "enabled": true,
+      "coverage_threshold": 80,
+      "security_scan": true,
+      "require_all_docs": true
+    },
+    "post-release": {
+      "auto_archive_sprint": true,
+      "generate_release_notes": true,
+      "prompt_retro": true
+    }
+  },
+  "feedback": {
+    "auto_prompt_on_fix": true,
+    "auto_prompt_on_arch_change": true,
+    "learning_categories": ["bugs", "performance", "security", "architecture", "tooling", "process"],
+    "adr_auto_number": true,
+    "retro_template": "full",
+    "review_default_count": 10
+  },
+  "context-optimizer": {
+    "enabled": true,
+    "auto_load_phase_docs": true,
+    "token_budget": {
+      "quick": 2000,
+      "standard": 10000,
+      "deep": 30000,
+      "full": 50000
+    }
+  },
+  "documents": {
+    "standard_locations": {
+      "discovery": "docs/DISCOVERY.md",
+      "progress": "docs/PROGRESS.md",
+      "context": "docs/CONTEXT.md",
+      "prd": "docs/PRD.md",
+      "tech_spec": "docs/TECH-SPEC.md",
+      "phases": "docs/phases/",
+      "adr": "docs/adr/",
+      "feedback": "docs/feedback/",
+      "sprints": "docs/sprints/"
+    }
+  },
+  "discovery": {
+    "enabled": true,
+    "require_before_docs": true,
+    "conversation_style": "friendly",
+    "auto_confirm": false,
+    "complexity_thresholds": {
+      "LOW": 3,
+      "MEDIUM": 6,
+      "HIGH": 10
+    }
+  },
+  "sync": {
+    "enabled": true,
+    "framework_source": "cc-initializer",
+    "merge_strategy": {
+      "agents": "add_missing",
+      "skills": "add_missing",
+      "commands": "add_missing",
+      "hooks": "add_missing",
+      "settings": "deep_merge"
+    },
+    "preserve_project_customizations": true,
+    "backup_before_sync": true,
+    "core_components": {
+      "agents": [
+        "file-explorer", "tech-spec-writer", "progress-tracker", "phase-tracker",
+        "doc-generator", "project-analyzer", "code-reviewer", "doc-splitter",
+        "test-helper", "git-troubleshooter", "google-searcher", "prd-writer",
+        "dev-docs-writer", "config-validator", "pr-creator", "commit-helper",
+        "doc-validator", "work-unit-manager", "branch-manager", "refactor-assistant",
+        "project-discovery"
+      ],
+      "skills": [
+        "init", "validate", "sprint", "agile-sync", "brainstorming",
+        "context-optimizer", "feedback-loop", "hook-creator", "subagent-creator",
+        "skill-creator", "prompt-enhancer", "dev-doc-system", "quality-gate",
+        "sync-fix", "repair", "readme-sync"
+      ],
+      "commands": [
+        "feature", "bugfix", "release", "phase", "git-workflow", "dev-doc-planner"
+      ],
+      "hooks": [
+        "phase-progress.sh", "pre-tool-use-safety.sh", "post-tool-use-tracker.sh",
+        "notification-handler.sh", "auto-doc-sync.sh"
+      ]
+    },
+    "auto_run_validation": true,
+    "report_changes": true
+  },
+  "update": {
+    "enabled": true,
+    "source_locations": [
+      "~/dev/cc-initializer",
+      "~/.cc-initializer"
+    ],
+    "env_var": "CC_INITIALIZER_PATH",
+    "github_repo": "https://github.com/tygwan/cc-initializer.git",
+    "default_branch": "main",
+    "auto_sync_after_update": true,
+    "show_changelog": true,
+    "require_confirmation": true
+  },
+  "safety": {
+    "block_dangerous_commands": true,
+    "warn_on_sensitive_files": true,
+    "require_confirmation_for_destructive": true
+  },
+  "validation": {
+    "auto_check_on_start": false,
+    "strict_mode": false,
+    "ignore_patterns": ["*.backup", "*.tmp"],
+    "required_agents": ["project-discovery", "progress-tracker", "phase-tracker", "dev-docs-writer"],
+    "required_hooks": ["phase-progress.sh", "pre-tool-use-safety.sh"],
+    "required_skills": ["init", "validate", "sprint", "agile-sync"]
+  },
+  "recovery": {
+    "enabled": true,
+    "auto_recover_on_hook_failure": true,
+    "max_retry_count": 3,
+    "log_retention_days": 7,
+    "graceful_degradation": true,
+    "critical_hooks": ["pre-tool-use-safety.sh"],
+    "non_critical_hooks": ["auto-doc-sync.sh", "phase-progress.sh", "post-tool-use-tracker.sh", "notification-handler.sh"],
+    "auto_fixable": {
+      "hook_permissions": true,
+      "missing_directories": true,
+      "log_rotation": true
+    },
+    "manual_required": {
+      "missing_docs": ["PROGRESS.md", "CONTEXT.md"],
+      "invalid_json": true
+    },
+    "log_settings": {
+      "log_dir": ".claude/logs",
+      "error_log": "error.log",
+      "recovery_log": "recovery.log",
+      "max_log_size_mb": 1,
+      "max_log_files": 5
+    }
+  }
+}

@@ -71,6 +71,8 @@ data/support-sets/*
 !data/support-sets/.gitkeep
 data/datasets/*
 !data/datasets/.gitkeep
+data/project-memory/*
+!data/project-memory/.gitkeep
 
 # Logs
 logs/*

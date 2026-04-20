@@ -1,7 +1,6 @@
-"""Label Studio Lite - Object Validation UI.
+"""Agentic Labeling Studio - Claude Style Light Theme UI.
 
-X-AnyLabeling inspired design with professional annotation workflow.
-Claude/Anthropic warm color palette.
+Clean, minimal design inspired by Claude's interface.
 """
 import os
 from io import BytesIO
@@ -14,42 +13,46 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 
 # Configuration
-REGISTRY_URL = os.getenv("REGISTRY_URL", "http://object-registry:8010")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:8000")
-DATA_DIR = os.getenv("DATA_DIR", "/data")
+REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8010")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000")
+DATA_DIR = os.getenv("DATA_DIR", "/home/coffin/dev/AgenticLabeling")
 
-# Anthropic/Claude Color Palette
+# Claude Style Light Color Palette
 COLORS = {
-    "bg_primary": "#FAF9F6",
-    "bg_secondary": "#F5F1EB",
-    "bg_dark": "#1A1A1A",
+    "bg_primary": "#FFFFFF",
+    "bg_secondary": "#F9FAFB",
     "bg_card": "#FFFFFF",
-    "accent": "#DA7756",
-    "accent_hover": "#C66A4A",
-    "accent_light": "#F5E6E0",
-    "text_primary": "#1A1A1A",
-    "text_secondary": "#6B6B6B",
+    "bg_hover": "#F3F4F6",
+    "accent": "#DA7756",  # Claude coral/orange
+    "accent_light": "#FCEEE8",
+    "accent_dark": "#C4624A",
+    "text_primary": "#1F2937",
+    "text_secondary": "#6B7280",
     "text_muted": "#9CA3AF",
-    "success": "#10B981",
-    "error": "#EF4444",
-    "warning": "#F59E0B",
-    "info": "#3B82F6",
-    "border": "#E5E5E5",
-    "border_focus": "#DA7756",
+    "success": "#059669",
+    "success_light": "#D1FAE5",
+    "error": "#DC2626",
+    "error_light": "#FEE2E2",
+    "warning": "#D97706",
+    "warning_light": "#FEF3C7",
+    "info": "#2563EB",
+    "info_light": "#DBEAFE",
+    "border": "#E5E7EB",
+    "border_dark": "#D1D5DB",
 }
 
-# Track colors for visualization
+# Object colors for visualization (visible on light background)
 TRACK_COLORS = [
-    "#DA7756", "#4ECDC4", "#45B7D1", "#96CEB4", "#F7DC6F",
-    "#BB8FCE", "#85C1E9", "#F8B500", "#00CED1", "#32CD32",
+    "#DA7756", "#2563EB", "#059669", "#DC2626", "#7C3AED",
+    "#D97706", "#0891B2", "#DB2777", "#4F46E5", "#15803D",
 ]
 
 # Page config
 st.set_page_config(
-    page_title="AgenticLabeling",
-    page_icon="🏷️",
+    page_title="Agentic Labeling Studio",
+    page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # Session state initialization
@@ -65,357 +68,183 @@ if "show_bboxes" not in st.session_state:
     st.session_state.show_bboxes = True
 
 
-# X-AnyLabeling inspired CSS
+# Claude Style Light Theme CSS
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-    /* Global */
+    /* Global Light Theme */
     .stApp {{
-        background-color: {COLORS["bg_primary"]};
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background-color: {COLORS["bg_secondary"]};
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: {COLORS["text_primary"]};
     }}
 
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
+    header {{visibility: hidden;}}
 
-    /* Top Toolbar */
-    .toolbar {{
-        background: {COLORS["bg_dark"]};
-        padding: 8px 16px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 16px;
+    /* Custom Scrollbar - Light */
+    ::-webkit-scrollbar {{
+        width: 8px;
+        height: 8px;
     }}
-
-    .toolbar-brand {{
-        color: white;
-        font-weight: 700;
-        font-size: 1.1rem;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    ::-webkit-scrollbar-track {{
+        background: {COLORS["bg_secondary"]};
     }}
-
-    .toolbar-divider {{
-        width: 1px;
-        height: 24px;
-        background: #444;
-    }}
-
-    .toolbar-item {{
-        color: #ccc;
-        font-size: 0.85rem;
-        padding: 6px 12px;
+    ::-webkit-scrollbar-thumb {{
+        background: {COLORS["border_dark"]};
         border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.15s;
+    }}
+    ::-webkit-scrollbar-thumb:hover {{
+        background: {COLORS["text_muted"]};
     }}
 
-    .toolbar-item:hover {{
-        background: #333;
-        color: white;
+    /* Main Content Area */
+    .main .block-container {{
+        padding-top: 1.5rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 100%;
     }}
 
-    .toolbar-progress {{
-        color: {COLORS["accent"]};
-        font-weight: 600;
-        margin-left: auto;
-    }}
-
-    /* Left Sidebar */
+    /* Sidebar Light Theme */
     [data-testid="stSidebar"] {{
-        background-color: {COLORS["bg_secondary"]};
+        background-color: {COLORS["bg_primary"]};
         border-right: 1px solid {COLORS["border"]};
     }}
 
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{
-        color: {COLORS["text_primary"]};
+    /* Headers */
+    h1, h2, h3, h4 {{
+        color: {COLORS["text_primary"]} !important;
+        font-weight: 600 !important;
     }}
 
-    /* Panel Headers */
-    .panel-header {{
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: {COLORS["text_secondary"]};
-        padding: 12px 0 8px 0;
-        border-bottom: 1px solid {COLORS["border"]};
-        margin-bottom: 12px;
-    }}
-
-    /* Tool Buttons */
-    .tool-btn {{
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: 6px;
-        background: transparent;
-        border: 1px solid transparent;
-        cursor: pointer;
-        transition: all 0.15s;
-        color: {COLORS["text_primary"]};
-        font-size: 0.875rem;
-    }}
-
-    .tool-btn:hover {{
-        background: {COLORS["accent_light"]};
-        border-color: {COLORS["accent"]};
-    }}
-
-    .tool-btn.active {{
-        background: {COLORS["accent"]};
-        color: white;
-    }}
-
-    .tool-icon {{
-        width: 20px;
-        text-align: center;
-    }}
-
-    /* Object List Item */
-    .object-item {{
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        border-radius: 6px;
-        margin-bottom: 4px;
-        cursor: pointer;
-        transition: all 0.15s;
-        border: 1px solid transparent;
-    }}
-
-    .object-item:hover {{
-        background: {COLORS["bg_secondary"]};
-    }}
-
-    .object-item.selected {{
-        background: {COLORS["accent_light"]};
-        border-color: {COLORS["accent"]};
-    }}
-
-    .object-item.validated {{
-        border-left: 3px solid {COLORS["success"]};
-    }}
-
-    .object-checkbox {{
-        margin-right: 10px;
-    }}
-
-    .object-label {{
-        flex: 1;
-        font-size: 0.875rem;
-        font-weight: 500;
-    }}
-
-    .object-confidence {{
-        font-size: 0.75rem;
-        color: {COLORS["text_muted"]};
-        background: {COLORS["bg_secondary"]};
-        padding: 2px 8px;
-        border-radius: 12px;
-    }}
-
-    /* Canvas Container */
-    .canvas-container {{
-        background: {COLORS["bg_card"]};
-        border-radius: 8px;
-        border: 1px solid {COLORS["border"]};
-        padding: 16px;
-        min-height: 500px;
-    }}
-
-    /* Status Bar */
-    .status-bar {{
-        background: {COLORS["bg_dark"]};
-        color: #ccc;
-        padding: 8px 16px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        gap: 24px;
-        font-size: 0.8rem;
-        margin-top: 16px;
-    }}
-
-    .status-item {{
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }}
-
-    .status-icon {{
-        opacity: 0.7;
-    }}
-
-    /* Right Panel - Label Editor */
-    .label-editor {{
-        background: {COLORS["bg_card"]};
-        border-radius: 8px;
-        border: 1px solid {COLORS["border"]};
-        padding: 16px;
-    }}
-
-    .label-field {{
-        margin-bottom: 16px;
-    }}
-
-    .label-field-label {{
-        font-size: 0.75rem;
-        font-weight: 500;
-        color: {COLORS["text_secondary"]};
-        margin-bottom: 6px;
-    }}
-
-    /* Action Buttons */
-    .action-btn {{
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.15s;
-        border: none;
-        width: 100%;
-        margin-bottom: 8px;
-    }}
-
-    .action-btn-primary {{
-        background: {COLORS["accent"]};
-        color: white;
-    }}
-
-    .action-btn-primary:hover {{
-        background: {COLORS["accent_hover"]};
-    }}
-
-    .action-btn-success {{
-        background: {COLORS["success"]};
-        color: white;
-    }}
-
-    .action-btn-danger {{
-        background: {COLORS["error"]};
-        color: white;
-    }}
-
-    .action-btn-secondary {{
-        background: transparent;
-        border: 1px solid {COLORS["border"]};
-        color: {COLORS["text_primary"]};
-    }}
-
-    /* Stats Cards */
-    .stat-card {{
-        background: {COLORS["bg_card"]};
-        border-radius: 8px;
-        padding: 12px;
-        text-align: center;
-        border: 1px solid {COLORS["border"]};
-    }}
-
-    .stat-value {{
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: {COLORS["accent"]};
-    }}
-
-    .stat-label {{
-        font-size: 0.7rem;
-        color: {COLORS["text_muted"]};
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }}
-
-    /* Badge */
-    .badge {{
-        display: inline-block;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        font-weight: 600;
-    }}
-
-    .badge-success {{
-        background: #D1FAE5;
-        color: #065F46;
-    }}
-
-    .badge-warning {{
-        background: #FEF3C7;
-        color: #92400E;
-    }}
-
-    .badge-error {{
-        background: #FEE2E2;
-        color: #991B1B;
-    }}
-
-    /* Keyboard Shortcut */
-    .kbd {{
-        display: inline-block;
-        padding: 2px 6px;
-        font-size: 0.7rem;
-        font-family: monospace;
-        background: {COLORS["bg_secondary"]};
-        border: 1px solid {COLORS["border"]};
-        border-radius: 4px;
-        color: {COLORS["text_secondary"]};
-    }}
-
-    /* Streamlit overrides */
+    /* Primary Buttons - Claude Orange */
+    .stButton > button[kind="primary"],
     .stButton > button {{
-        background-color: {COLORS["accent"]};
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
+        background-color: {COLORS["accent"]} !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        font-weight: 500 !important;
+        transition: all 0.15s ease !important;
+        box-shadow: none !important;
     }}
-
+    .stButton > button[kind="primary"]:hover,
     .stButton > button:hover {{
-        background-color: {COLORS["accent_hover"]};
+        background-color: {COLORS["accent_dark"]} !important;
+        box-shadow: 0 2px 8px rgba(218, 119, 86, 0.3) !important;
     }}
 
+    /* Secondary Buttons */
+    .stButton > button[kind="secondary"] {{
+        background-color: {COLORS["bg_primary"]} !important;
+        color: {COLORS["text_primary"]} !important;
+        border: 1px solid {COLORS["border"]} !important;
+        box-shadow: none !important;
+    }}
+    .stButton > button[kind="secondary"]:hover {{
+        background-color: {COLORS["bg_hover"]} !important;
+        border-color: {COLORS["border_dark"]} !important;
+    }}
+
+    /* Input Fields */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div {{
+        background-color: {COLORS["bg_primary"]} !important;
+        border: 1px solid {COLORS["border"]} !important;
+        border-radius: 8px !important;
+        color: {COLORS["text_primary"]} !important;
+    }}
+    .stTextInput > div > div > input:focus {{
+        border-color: {COLORS["accent"]} !important;
+        box-shadow: 0 0 0 3px {COLORS["accent_light"]} !important;
+    }}
+
+    /* Checkbox */
+    .stCheckbox label {{
+        color: {COLORS["text_primary"]} !important;
+    }}
+
+    /* Progress Bar */
+    .stProgress > div > div > div {{
+        background-color: {COLORS["accent"]} !important;
+    }}
+
+    /* Metric */
+    [data-testid="stMetricValue"] {{
+        color: {COLORS["accent"]} !important;
+        font-weight: 700 !important;
+    }}
+    [data-testid="stMetricLabel"] {{
+        color: {COLORS["text_secondary"]} !important;
+    }}
+
+    /* Success/Info/Warning/Error alerts */
+    .stSuccess {{
+        background-color: {COLORS["success_light"]} !important;
+        color: {COLORS["success"]} !important;
+        border: none !important;
+    }}
+    .stInfo {{
+        background-color: {COLORS["info_light"]} !important;
+        color: {COLORS["info"]} !important;
+        border: none !important;
+    }}
+    .stWarning {{
+        background-color: {COLORS["warning_light"]} !important;
+        color: {COLORS["warning"]} !important;
+        border: none !important;
+    }}
+    .stError {{
+        background-color: {COLORS["error_light"]} !important;
+        color: {COLORS["error"]} !important;
+        border: none !important;
+    }}
+
+    /* Container with height (scrollable panels) */
+    [data-testid="stVerticalBlock"] > [style*="height"] {{
+        background-color: {COLORS["bg_primary"]} !important;
+        border: 1px solid {COLORS["border"]} !important;
+        border-radius: 12px !important;
+    }}
+
+    /* Divider */
     hr {{
-        border: none;
-        height: 1px;
-        background: {COLORS["border"]};
-        margin: 16px 0;
+        border-color: {COLORS["border"]} !important;
     }}
 
-    /* Empty State */
-    .empty-state {{
-        text-align: center;
-        padding: 48px 24px;
-        color: {COLORS["text_muted"]};
+    /* Caption */
+    .stCaption, [data-testid="stCaptionContainer"] {{
+        color: {COLORS["text_muted"]} !important;
     }}
 
-    .empty-icon {{
-        font-size: 3rem;
-        margin-bottom: 16px;
-    }}
-
-    /* Error Container */
-    .error-container {{
-        background: #FEF2F2;
-        border: 1px solid #FECACA;
-        border-radius: 8px;
-        padding: 16px;
-        color: #991B1B;
-    }}
-
-    /* Info Box */
-    .info-box {{
-        background: {COLORS["accent_light"]};
-        border: 1px solid {COLORS["accent"]};
-        border-radius: 8px;
-        padding: 12px 16px;
-        font-size: 0.875rem;
+    /* Markdown text */
+    .stMarkdown {{
         color: {COLORS["text_primary"]};
+    }}
+
+    /* Column gaps */
+    [data-testid="column"] {{
+        padding: 0 0.5rem;
+    }}
+
+    /* Select box dropdown */
+    [data-baseweb="select"] {{
+        background-color: {COLORS["bg_primary"]} !important;
+    }}
+    [data-baseweb="menu"] {{
+        background-color: {COLORS["bg_primary"]} !important;
+        border: 1px solid {COLORS["border"]} !important;
+    }}
+
+    /* Image container */
+    [data-testid="stImage"] {{
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid {COLORS["border"]};
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -450,7 +279,7 @@ def api_request(method: str, url: str, **kwargs) -> tuple:
         return None, str(e)
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=5)
 def get_stats() -> dict:
     """Get registry statistics."""
     data, error = api_request("GET", f"{REGISTRY_URL}/stats")
@@ -475,18 +304,21 @@ def get_objects(is_validated=None, category=None, limit=100) -> tuple:
     return (data if data else [], error)
 
 
+@st.cache_data(ttl=5)
 def get_sources(limit=50) -> list:
     """Get source list."""
     data, error = api_request("GET", f"{REGISTRY_URL}/sources", params={"limit": limit})
     return data if data else []
 
 
+@st.cache_data(ttl=5)
 def get_source(source_id: str) -> Optional[dict]:
     """Get source details."""
     data, error = api_request("GET", f"{REGISTRY_URL}/sources/{source_id}")
     return data
 
 
+@st.cache_data(ttl=3)
 def get_objects_by_source(source_id: str) -> list:
     """Get objects for a specific source."""
     data, error = api_request("GET", f"{REGISTRY_URL}/objects", params={"source_id": source_id, "limit": 200})
@@ -620,24 +452,47 @@ def draw_annotations(image: Image.Image, objects: list, selected_idx: Optional[i
 # ==================== UI Components ====================
 
 def render_toolbar(stats: dict):
-    """Render top toolbar."""
+    """Render top toolbar with functional menus."""
     total = stats.get("objects", 0) or 0
     validated = stats.get("validated_objects", 0) or 0
     progress_pct = (validated / total * 100) if total > 0 else 0
 
-    st.markdown(f"""
-    <div class="toolbar">
-        <div class="toolbar-brand">🏷️ AgenticLabeling</div>
-        <div class="toolbar-divider"></div>
-        <div class="toolbar-item">📁 파일</div>
-        <div class="toolbar-item">👁️ 보기</div>
-        <div class="toolbar-item">🔧 도구</div>
-        <div class="toolbar-item">❓ 도움말</div>
-        <div class="toolbar-progress">
-            진행률: {validated}/{total} ({progress_pct:.0f}% 완료)
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Toolbar with Streamlit components
+    cols = st.columns([2, 1, 1, 1, 1, 4])
+
+    with cols[0]:
+        st.markdown("### 🏷️ AgenticLabeling")
+
+    with cols[1]:
+        with st.popover("📁 파일"):
+            if st.button("🔄 새로고침", key="tb_refresh", width="stretch"):
+                st.cache_data.clear()
+                st.rerun()
+            if st.button("📤 내보내기", key="tb_export", width="stretch"):
+                st.session_state.active_tab = 1
+                st.rerun()
+
+    with cols[2]:
+        with st.popover("👁️ 보기"):
+            st.session_state.show_labels = st.checkbox("라벨 표시", value=st.session_state.get("show_labels", True), key="tb_labels")
+            st.session_state.show_bboxes = st.checkbox("박스 표시", value=st.session_state.get("show_bboxes", True), key="tb_bboxes")
+
+    with cols[3]:
+        with st.popover("🔧 도구"):
+            st.markdown("**검증 도구**")
+            st.caption("V: 현재 객체 검증")
+            st.caption("X: 현재 객체 삭제")
+            st.caption("←/→: 이전/다음 이미지")
+
+    with cols[4]:
+        with st.popover("❓ 도움말"):
+            st.markdown("**AgenticLabeling v0.1**")
+            st.markdown("AI 기반 자동 라벨링 도구")
+            st.markdown("---")
+            st.markdown("[문서](https://github.com) | [이슈](https://github.com)")
+
+    with cols[5]:
+        st.markdown(f"<div style='text-align: right; padding-top: 8px; color: #DA7756; font-weight: 600;'>진행률: {validated}/{total} ({progress_pct:.0f}%)</div>", unsafe_allow_html=True)
 
 
 def render_status_bar(source: Optional[dict], objects: list, current_idx: int):
@@ -767,46 +622,64 @@ def render_left_sidebar(stats: dict, categories: list) -> dict:
         }
 
 
-def render_object_list(objects: list, selected_idx: Optional[int]) -> Optional[int]:
-    """Render right panel object list."""
-    st.markdown('<div class="panel-header">📋 객체 목록</div>', unsafe_allow_html=True)
+def render_image_list(sources: list, current_idx: int) -> int:
+    """Render scrollable image list panel."""
+    st.markdown("#### 🖼️ 이미지 목록")
+    st.caption(f"총 {len(sources)}개")
 
+    new_idx = current_idx
+
+    # Scrollable container with fixed height
+    with st.container(height=400):
+        for idx, source in enumerate(sources):
+            filename = source.get("file_path", "").split("/")[-1] or f"Source {idx}"
+            source_type = source.get("source_type", "image")
+            is_selected = idx == current_idx
+
+            # Icon based on type
+            icon = "🖼️" if source_type == "image" else "🎬" if source_type == "video" else "📄"
+
+            # Button for each image
+            label = f"{icon} {filename[:20]}{'...' if len(filename) > 20 else ''}"
+            btn_type = "primary" if is_selected else "secondary"
+
+            if st.button(label, key=f"img_btn_{idx}", width="stretch", type=btn_type):
+                new_idx = idx
+
+    return new_idx
+
+
+def render_object_list(objects: list, selected_idx: Optional[int]) -> Optional[int]:
+    """Render object list with click-to-select buttons."""
     if not objects:
-        st.markdown("""
-        <div class="empty-state">
-            <div class="empty-icon">📭</div>
-            <p>객체가 없습니다</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("객체 없음")
         return None
 
     new_selected = selected_idx
 
+    # Scrollable container for objects
     for idx, obj in enumerate(objects):
         category = obj.get("category_name", "unknown")
         confidence = obj.get("confidence", 0) or 0
         is_validated = obj.get("is_validated", False)
-        object_id = obj.get("object_id", "")[:8]
+        is_selected = idx == selected_idx
 
-        selected_class = "selected" if idx == selected_idx else ""
-        validated_class = "validated" if is_validated else ""
+        # Status icon
+        if is_validated:
+            status = "✅"
+        elif is_selected:
+            status = "👉"
+        else:
+            status = "⬜"
 
-        col1, col2, col3 = st.columns([0.5, 3, 1])
+        # Button style based on selection
+        btn_type = "primary" if is_selected else "secondary"
 
-        with col1:
-            if st.checkbox("", value=(idx == selected_idx), key=f"obj_select_{idx}",
-                          label_visibility="collapsed"):
-                new_selected = idx
-
-        with col2:
-            status = "✓" if is_validated else "○"
-            st.markdown(f"**{status} {category}**")
-            st.caption(f"ID: {object_id}...")
-
-        with col3:
-            st.markdown(f"""
-            <div class="object-confidence">{confidence:.0%}</div>
-            """, unsafe_allow_html=True)
+        # Object button
+        label = f"{status} {category} ({confidence:.0%})"
+        if st.button(label, key=f"obj_btn_{idx}", width="stretch",
+                    type=btn_type if is_selected else "secondary"):
+            new_selected = idx
 
     return new_selected
 
@@ -856,10 +729,10 @@ def render_label_editor(obj: Optional[dict], filters: dict) -> tuple:
     reject_clicked = False
 
     if not is_validated:
-        if st.button("✓ 검증하기", key="validate_btn", use_container_width=True, type="primary"):
+        if st.button("✓ 검증하기", key="validate_btn", width="stretch", type="primary"):
             validate_clicked = True
 
-        if st.button("✗ 거부하기", key="reject_btn", use_container_width=True):
+        if st.button("✗ 거부하기", key="reject_btn", width="stretch"):
             reject_clicked = True
     else:
         st.success("이 객체는 검증되었습니다")
@@ -895,120 +768,231 @@ def render_canvas(source: Optional[dict], objects: list, selected_idx: Optional[
     annotated_image = draw_annotations(image, objects, selected_idx, show_labels, show_bboxes)
 
     # Display
-    st.image(annotated_image, use_container_width=True)
+    st.image(annotated_image, width="stretch")
 
 
 # ==================== Main Views ====================
 
-def annotation_view():
-    """Main annotation view with X-AnyLabeling layout."""
+def render_workflow_steps(current_step: int, stats: dict):
+    """Render workflow progress indicator using native Streamlit components."""
+    steps = [
+        ("📤", "업로드", stats.get("sources", 0)),
+        ("🔍", "탐지", stats.get("objects", 0)),
+        ("✓", "검증", stats.get("validated_objects", 0)),
+        ("📦", "내보내기", stats.get("datasets", 0)),
+    ]
+
+    cols = st.columns(4)
+    for i, (icon, label, count) in enumerate(steps):
+        with cols[i]:
+            is_current = i == current_step
+            is_active = i <= current_step
+
+            if is_current:
+                st.markdown(f"**{icon} {label}**")
+                st.caption(f"{count}개 • 진행중")
+            elif is_active:
+                st.markdown(f"{icon} {label}")
+                st.caption(f"{count}개 ✓")
+            else:
+                st.markdown(f"~~{icon} {label}~~")
+                st.caption(f"{count}개")
+
+
+def unified_workspace_view():
+    """Unified workspace showing entire pipeline in one page."""
     stats = get_stats()
     categories = get_categories()
-
-    # Top toolbar
-    render_toolbar(stats)
-
-    # Left sidebar (filters and settings)
-    filters = render_left_sidebar(stats, categories)
-
-    # Get sources for navigation
     sources = get_sources(limit=100)
 
-    # Main content area
+    # Calculate current workflow step
+    total_objects = stats.get("objects", 0)
+    validated = stats.get("validated_objects", 0)
     if not sources:
-        st.markdown("""
-        <div class="canvas-container">
-            <div class="empty-state">
-                <div class="empty-icon">📁</div>
-                <p>등록된 소스가 없습니다</p>
-                <p style="font-size: 0.875rem; margin-top: 8px;">
-                    Gateway API를 통해 이미지를 업로드하세요
-                </p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-
-    # Source selector
-    source_options = {
-        f"{s.get('file_path', '').split('/')[-1]} ({s.get('source_type', 'image')})": s
-        for s in sources
-    }
-
-    col_nav1, col_nav2, col_nav3 = st.columns([1, 6, 1])
-    with col_nav1:
-        if st.button("◀ 이전", use_container_width=True):
-            if st.session_state.current_image_idx > 0:
-                st.session_state.current_image_idx -= 1
-                st.session_state.selected_object_idx = None
-                st.rerun()
-
-    with col_nav2:
-        selected_source_name = st.selectbox(
-            "소스 선택",
-            list(source_options.keys()),
-            index=min(st.session_state.current_image_idx, len(source_options) - 1),
-            label_visibility="collapsed"
-        )
-        current_source = source_options.get(selected_source_name)
-
-    with col_nav3:
-        if st.button("다음 ▶", use_container_width=True):
-            if st.session_state.current_image_idx < len(sources) - 1:
-                st.session_state.current_image_idx += 1
-                st.session_state.selected_object_idx = None
-                st.rerun()
-
-    # Get objects for current source
-    if current_source:
-        source_id = current_source.get("source_id", "")
-        objects = get_objects_by_source(source_id)
+        current_step = 0
+    elif total_objects == 0:
+        current_step = 0
+    elif validated == 0:
+        current_step = 1
+    elif validated < total_objects:
+        current_step = 2
     else:
+        current_step = 3
+
+    # Workflow Steps Indicator
+    render_workflow_steps(current_step, stats)
+
+    # Get current source data early
+    if sources:
+        if st.session_state.current_image_idx >= len(sources):
+            st.session_state.current_image_idx = 0
+        current_source = sources[st.session_state.current_image_idx]
+        objects = get_objects_by_source(current_source.get("source_id", ""))
+    else:
+        current_source = None
         objects = []
 
-    # Three-column layout: Object List | Canvas | Label Editor
-    col_left, col_center, col_right = st.columns([2, 5, 2])
+    # Three-Panel Layout: Gallery | Preview | Actions
+    col_gallery, col_preview, col_actions = st.columns([2, 5, 3])
 
-    with col_left:
-        selected_idx = render_object_list(objects, st.session_state.selected_object_idx)
-        if selected_idx != st.session_state.selected_object_idx:
-            st.session_state.selected_object_idx = selected_idx
-            st.rerun()
+    # ============ LEFT PANEL: Source Gallery ============
+    with col_gallery:
+        st.markdown("#### 📁 소스")
 
-    with col_center:
-        render_canvas(
-            current_source,
-            objects,
-            st.session_state.selected_object_idx,
-            filters["show_labels"],
-            filters["show_bboxes"]
-        )
+        if not sources:
+            st.info("📤 API로 이미지를 업로드하세요")
+        else:
+            with st.container(height=450):
+                for idx, source in enumerate(sources):
+                    fname = source.get("file_path", "").split("/")[-1]
+                    is_selected = idx == st.session_state.current_image_idx
 
-    with col_right:
+                    btn_label = f"{'▶ ' if is_selected else ''}{fname[:18]}{'...' if len(fname) > 18 else ''}"
+                    if st.button(
+                        btn_label,
+                        key=f"src_{idx}",
+                        width="stretch",
+                        type="primary" if is_selected else "secondary"
+                    ):
+                        st.session_state.current_image_idx = idx
+                        st.session_state.selected_object_idx = None
+                        st.rerun()
+
+    # ============ CENTER PANEL: Preview & Detection ============
+    with col_preview:
+        if current_source:
+            # Header with navigation
+            nav1, nav2, nav3 = st.columns([1, 8, 1])
+            with nav1:
+                if st.button("◀", key="nav_prev", width="stretch", disabled=st.session_state.current_image_idx <= 0):
+                    st.session_state.current_image_idx -= 1
+                    st.session_state.selected_object_idx = None
+                    st.rerun()
+            with nav2:
+                filename = current_source.get("file_path", "").split("/")[-1]
+                st.markdown(f"**{filename}**")
+            with nav3:
+                if st.button("▶", key="nav_next", width="stretch", disabled=st.session_state.current_image_idx >= len(sources) - 1):
+                    st.session_state.current_image_idx += 1
+                    st.session_state.selected_object_idx = None
+                    st.rerun()
+
+            # Detection status
+            if objects:
+                validated_cnt = sum(1 for o in objects if o.get('is_validated'))
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
+                    st.success(f"✓ {len(objects)}개 탐지")
+                with col_s2:
+                    st.info(f"검증: {validated_cnt}/{len(objects)}")
+
+            # Canvas
+            render_canvas(
+                current_source,
+                objects,
+                st.session_state.selected_object_idx,
+                st.session_state.get("show_labels", True),
+                st.session_state.get("show_bboxes", True)
+            )
+
+            # View controls
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.session_state.show_labels = st.checkbox("라벨", value=True, key="chk_labels")
+            with c2:
+                st.session_state.show_bboxes = st.checkbox("박스", value=True, key="chk_bboxes")
+            with c3:
+                if st.button("🔄", key="refresh_canvas", help="새로고침"):
+                    st.cache_data.clear()
+                    st.rerun()
+        else:
+            st.markdown("""
+            <div style="text-align: center; padding: 100px 40px; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.1);">
+                <div style="font-size: 4rem; margin-bottom: 20px;">🖼️</div>
+                <h3 style="color: #fff; margin-bottom: 8px;">이미지를 선택하세요</h3>
+                <p style="color: #666;">왼쪽 갤러리에서 이미지를 선택하거나 API로 업로드하세요</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ============ RIGHT PANEL: Validation & Export ============
+    with col_actions:
+        # Object List Section
+        st.markdown("#### 🎯 탐지된 객체")
+
+        if objects:
+            with st.container(height=200):
+                for idx, obj in enumerate(objects):
+                    category = obj.get("category_name", "unknown")
+                    confidence = obj.get("confidence", 0) or 0
+                    is_validated = obj.get("is_validated", False)
+                    is_selected = idx == st.session_state.selected_object_idx
+
+                    icon = "✅" if is_validated else "⬜"
+                    btn_label = f"{icon} {category} ({confidence:.0%})"
+
+                    if st.button(btn_label, key=f"obj_{idx}", width="stretch",
+                                type="primary" if is_selected else "secondary"):
+                        st.session_state.selected_object_idx = idx
+                        st.rerun()
+        else:
+            st.caption("탐지된 객체 없음")
+
+        st.divider()
+
+        # Validation Section
+        st.markdown("#### ✓ 검증")
+
         selected_obj = objects[st.session_state.selected_object_idx] if (
             st.session_state.selected_object_idx is not None and
-            st.session_state.selected_object_idx < len(objects)
+            objects and st.session_state.selected_object_idx < len(objects)
         ) else None
 
-        validate_clicked, reject_clicked = render_label_editor(selected_obj, filters)
+        if selected_obj:
+            obj_id = selected_obj.get("object_id", "")
+            is_validated = selected_obj.get("is_validated", False)
 
-        if validate_clicked and selected_obj:
-            object_id = selected_obj.get("object_id", "")
-            if validate_object(object_id, filters["reviewer_name"], filters["default_quality"]):
-                st.success("검증 완료!")
-                st.cache_data.clear()
-                st.rerun()
+            st.caption(f"{selected_obj.get('category_name')} • {obj_id[:8]}...")
 
-        if reject_clicked and selected_obj:
-            object_id = selected_obj.get("object_id", "")
-            if reject_object(object_id):
-                st.warning("객체가 삭제되었습니다")
-                st.session_state.selected_object_idx = None
-                st.cache_data.clear()
-                st.rerun()
+            if is_validated:
+                st.success("✓ 검증됨")
+            else:
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("✓ 승인", key="approve_btn", width="stretch", type="primary"):
+                        validate_object(obj_id, "reviewer", 0.9)
+                        st.cache_data.clear()
+                        st.rerun()
+                with c2:
+                    if st.button("✗ 삭제", key="delete_btn", width="stretch"):
+                        reject_object(obj_id)
+                        st.session_state.selected_object_idx = None
+                        st.cache_data.clear()
+                        st.rerun()
 
-    # Status bar
-    render_status_bar(current_source, objects, st.session_state.current_image_idx)
+            # Bulk validation
+            unvalidated = [o for o in objects if not o.get("is_validated")]
+            if unvalidated:
+                if st.button(f"⚡ 모두 검증 ({len(unvalidated)}개)", key="validate_all", width="stretch"):
+                    for obj in unvalidated:
+                        validate_object(obj.get("object_id", ""), "reviewer", 0.9)
+                    st.cache_data.clear()
+                    st.rerun()
+        else:
+            st.caption("객체를 선택하세요")
+
+        st.divider()
+
+        # Quick Export Section
+        st.markdown("#### 📦 내보내기")
+
+        validated_count = stats.get("validated_objects", 0)
+        st.metric("검증된 객체", f"{validated_count}개")
+
+        export_format = st.selectbox("형식", ["YOLO", "COCO"], key="quick_export_fmt", label_visibility="collapsed")
+
+        if st.button("🚀 내보내기", key="quick_export_btn", width="stretch", type="primary",
+                    disabled=validated_count == 0):
+            st.success(f"✓ {export_format} 형식으로 내보내기 준비됨")
 
 
 def export_view():
@@ -1019,7 +1003,6 @@ def export_view():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown('<div class="label-editor">', unsafe_allow_html=True)
         st.markdown("### 설정")
 
         dataset_name = st.text_input("데이터셋 이름", value="my_dataset")
@@ -1031,10 +1014,7 @@ def export_view():
         test_ratio = 1.0 - train_ratio - val_ratio
         st.metric("Test", f"{test_ratio:.0%}")
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
     with col2:
-        st.markdown('<div class="label-editor">', unsafe_allow_html=True)
         st.markdown("### 필터")
 
         only_validated = st.checkbox("검증된 객체만", value=True)
@@ -1044,11 +1024,9 @@ def export_view():
         cat_names = [c.get("name", "") for c in categories if c.get("name")]
         selected_cats = st.multiselect("카테고리", cat_names, default=cat_names)
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown("---")
 
-    if st.button("🚀 내보내기 시작", use_container_width=True, type="primary"):
+    if st.button("🚀 내보내기 시작", width="stretch", type="primary"):
         with st.spinner("내보내는 중..."):
             try:
                 resp = httpx.post(
@@ -1160,24 +1138,39 @@ def stats_view():
 
 # ==================== Main App ====================
 
+def render_header():
+    """Render compact header with branding."""
+    col1, col2 = st.columns([8, 2])
+    with col1:
+        st.markdown("### ⚡ Agentic**Label**")
+        st.caption("AI Vision Labeling Studio")
+    with col2:
+        st.success("● 연결됨")
+
+
 def main():
-    """Main application with tabbed navigation."""
+    """Main application - single page workflow."""
 
-    # Tab navigation
-    tab1, tab2, tab3 = st.tabs([
-        "🏷️ 주석 편집",
-        "📦 내보내기",
-        "📊 통계",
-    ])
+    # Check connection
+    try:
+        import httpx
+        r = httpx.get(f"{REGISTRY_URL}/stats", timeout=5)
+        stats = r.json().get('data', {})
+        connected = True
+    except Exception as e:
+        connected = False
+        stats = {}
 
-    with tab1:
-        annotation_view()
+    if not connected:
+        st.error(f"❌ Registry 연결 실패: {REGISTRY_URL}")
+        st.info("Object Registry 서비스가 실행 중인지 확인하세요.")
+        return
 
-    with tab2:
-        export_view()
+    # Compact Header
+    render_header()
 
-    with tab3:
-        stats_view()
+    # Single Page Unified Workspace
+    unified_workspace_view()
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
     <strong>AI-Powered Automatic Labeling Platform</strong>
   </p>
   <p align="center">
-    Microservices-based auto-labeling system using Florence-2, SAM2, and DINOv2
+    Single-service MVP for Florence-2 + SAM2 auto-labeling, review, and export
   </p>
 </p>
 
@@ -19,7 +19,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/tests-120%20passing-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-MVP%20baseline%20passing-brightgreen.svg" alt="Tests">
   <img src="https://img.shields.io/badge/docker-ready-blue.svg" alt="Docker">
 </p>
 
@@ -27,96 +27,50 @@
 
 ## Overview
 
-**AgenticLabeling** is a comprehensive AI-powered automatic labeling platform built on a microservices architecture. It combines state-of-the-art vision models to provide end-to-end object detection, segmentation, classification, and tracking capabilities.
+**AgenticLabeling** is currently packaged around a single MVP application that handles image upload, Florence-2 detection, SAM2 segmentation, review, and dataset export in one service. The previous microservices stack is preserved only as a legacy deployment path.
 
 ### Key Capabilities
 
-- **Auto-Labeling Pipeline**: Image → Detection → Segmentation → Classification → Registry
-- **Video Processing**: Frame extraction, Re-ID tracking, trajectory visualization
-- **Model Training**: YOLO training with MLflow experiment tracking
-- **Quality Assurance**: Streamlit-based validation UI with track visualization
-- **Dataset Export**: YOLO and COCO format support
+- **Auto-Labeling Pipeline**: Image → Florence-2 Detection → SAM2 Segmentation → Registry
+- **Review Workspace**: Browser-based approve/delete flow
+- **Dataset Export**: YOLO and COCO zip export
+- **Runtime Fallback**: If SAM2 is unavailable, the pipeline survives with box-mask fallback
+- **Legacy Stack Preserved**: The old microservices deployment remains available separately
 
 ---
 
 ## Features
 
-### AI Models
+### AI Models In The MVP
 
 | Model | Task | Description |
 |-------|------|-------------|
 | **Florence-2** | Detection | Open-vocabulary object detection with grounding |
 | **SAM2** | Segmentation | Instance segmentation with fine masks |
-| **DINOv2** | Classification | Visual embeddings for similarity search |
-| **YOLO** | Training | Custom model training and inference |
+### Legacy Components Still Available
 
-### Core Features
-
-- **Object Registry**: SQLite + ChromaDB for structured data and vector search
-- **Evaluation Agent**: mAP, mAP50-95, Confusion Matrix metrics
-- **Re-ID Tracker**: Appearance-based object tracking across frames
-- **Embedding Search**: LRU cached similarity search with batch support
-- **Track Visualization**: Trajectory and timeline views
-
-<details>
-<summary><b>View Feature Diagram</b></summary>
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        API Gateway (8000)                        │
-├─────────────────────────────────────────────────────────────────┤
-│  /auto-label  │  /detect  │  /segment  │  /train  │  /evaluate  │
-└───────┬───────┴─────┬─────┴─────┬──────┴────┬─────┴──────┬──────┘
-        │             │           │           │            │
-        ▼             ▼           ▼           ▼            ▼
-   ┌─────────┐  ┌──────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐
-   │Detection│  │Segment-  │ │Classif- │ │Training │ │Evaluation│
-   │ Agent   │  │ation     │ │ication  │ │ Agent   │ │  Agent   │
-   │Florence2│  │SAM2      │ │DINOv2   │ │YOLO     │ │mAP/CM    │
-   └────┬────┘  └────┬─────┘ └────┬────┘ └────┬────┘ └────┬─────┘
-        │            │            │           │           │
-        └────────────┴────────────┴───────────┴───────────┘
-                                  │
-                                  ▼
-                    ┌─────────────────────────┐
-                    │    Object Registry      │
-                    │   SQLite + ChromaDB     │
-                    └─────────────────────────┘
-```
-
-</details>
+- **DINOv2 classification**
+- **YOLO training**
+- **Video preprocessing / tracking**
+- **Evaluation / MLflow**
+- **Microservice gateway and Streamlit UI**
 
 ---
 
 ## Architecture
 
-### Services
+### Default Runtime
 
-| Service | Port | GPU | Description |
-|---------|------|-----|-------------|
-| gateway | 8000 | ❌ | API routing and orchestration |
-| detection-agent | 8001 | ✅ | Florence-2 object detection |
-| segmentation-agent | 8002 | ✅ | SAM2 instance segmentation |
-| classification-agent | 8003 | ✅ | DINOv2 embeddings |
-| training-agent | 8005 | ✅ | YOLO model training |
-| evaluation-agent | 8007 | ✅ | Model evaluation metrics |
-| preprocessing-agent | 8008 | ❌ | Video processing & Re-ID tracking |
-| object-registry | 8010 | ❌ | SQLite + ChromaDB storage |
-| data-manager | 8006 | ❌ | YOLO/COCO dataset export |
-| label-studio-lite | 8501 | ❌ | Streamlit validation UI |
-| mlflow | 5000 | ❌ | Experiment tracking |
+| Component | Port | GPU | Description |
+|-----------|------|-----|-------------|
+| agenticlabeling-mvp | 8090 | ✅ | Upload, detect, segment, review, export |
 
 ### Data Flow
 
 ```
-Image/Video Input
+Image Input
        │
        ▼
-┌──────────────────┐
-│  Preprocessing   │ ← Frame extraction, Video processing
-└────────┬─────────┘
-         │
-         ▼
 ┌──────────────────┐
 │    Detection     │ ← Florence-2 grounding
 └────────┬─────────┘
@@ -128,22 +82,21 @@ Image/Video Input
          │
          ▼
 ┌──────────────────┐
-│  Classification  │ ← DINOv2 embeddings
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│  Object Registry │ ← Store objects, tracks, embeddings
+│  Local Registry   │ ← SQLite + filesystem assets
 └────────┬─────────┘
          │
     ┌────┴────┐
     ▼         ▼
 ┌───────┐ ┌───────┐
-│Export │ │ Train │
-│YOLO/  │ │ YOLO  │
-│COCO   │ │ Model │
+│Review │ │Export │
+│Approve│ │YOLO/  │
+│Delete │ │COCO   │
 └───────┘ └───────┘
 ```
+
+### Legacy Runtime
+
+The previous multi-container stack is preserved in [`docker-compose.legacy.yml`](/home/coffin/dev/AgenticLabeling/docker-compose.legacy.yml). The default [`docker-compose.yml`](/home/coffin/dev/AgenticLabeling/docker-compose.yml) now starts only the MVP app.
 
 ---
 
@@ -158,41 +111,38 @@ Image/Video Input
 ### Installation
 
 ```bash
-# Clone repository
-git clone https://github.com/tygwan/AgenticLabeling.git
-cd AgenticLabeling
+# Start the default MVP container
+docker compose up --build
 
-# Start with Docker Compose
-docker-compose up -d
+# Or use the helper script
+./scripts/run_mvp_docker.sh
 
 # Check health
-curl http://localhost:8000/health
+curl http://localhost:8090/health
 ```
 
 ### Basic Usage
 
 ```bash
 # Auto-label an image
-curl -X POST "http://localhost:8000/auto-label" \
-  -F "file=@image.jpg" \
-  -F "prompt=person, car, dog"
+curl -X POST "http://localhost:8090/api/pipeline/auto-label" \
+  -F "image=@image.jpg" \
+  -F "project_id=default-project" \
+  -F "classes=person,car,dog"
 
 # Export dataset
-curl -X POST "http://localhost:8000/export" \
-  -d "dataset_name=my_dataset" \
-  -d "format=yolo"
-
-# Train YOLO model
-curl -X POST "http://localhost:8000/train/start" \
-  -H "Content-Type: application/json" \
-  -d '{"dataset_path": "data/datasets/my_dataset", "epochs": 100}'
+curl -X POST "http://localhost:8090/api/export" \
+  -F "dataset_name=my_dataset" \
+  -F "export_format=yolo" \
+  -F "only_validated=true"
 ```
 
 ### Access UIs
 
-- **API Documentation**: http://localhost:8000/docs
-- **Validation UI**: http://localhost:8501
-- **MLflow Dashboard**: http://localhost:5000
+- **MVP Home**: http://localhost:8090/
+- **Review UI**: http://localhost:8090/review
+- **API Health**: http://localhost:8090/health
+- **Legacy Stack**: `./scripts/run_legacy_docker.sh`
 
 ---
 
@@ -204,6 +154,10 @@ curl -X POST "http://localhost:8000/train/start" \
 | [Architecture Spec](docs/tech-specs/architecture-spec.md) | Detailed system architecture |
 | [Development Progress](docs/progress/development-progress.md) | Project status and roadmap |
 | [PRD](docs/prd/agenticlabeling-prd.md) | Product requirements document |
+| [Navigability Docs](docs/navigability/system-map.md) | System map, edit map, interface catalog, failure memory |
+| [Standards Application](docs/standards/adoption-model.md) | How dev-standards are applied inside this repository |
+| [Implementation Memory](docs/standards/implementation-memory-summary.md) | Why major implementation choices were made and what they changed |
+| [Project Memory](project_memory/README.md) | Local engineering memory store and usage |
 
 ---
 
@@ -217,39 +171,39 @@ import httpx
 # Label an image
 with open("image.jpg", "rb") as f:
     response = httpx.post(
-        "http://localhost:8000/auto-label",
-        files={"file": f},
-        data={"prompt": "person, car, dog", "register": True}
+        "http://localhost:8090/api/pipeline/auto-label",
+        files={"image": f},
+        data={"project_id": "default-project", "classes": "person,car,dog"}
     )
     result = response.json()
-    print(f"Detected {len(result['data']['objects'])} objects")
+    print(f"Detected {result['detections']} objects")
 ```
 
-### Object Search
+### Review Objects
 
 ```python
-# Search similar objects by embedding
-response = httpx.post(
-    "http://localhost:8000/similar",
-    json={"embedding": [...], "top_k": 10}
+# List objects for a source
+response = httpx.get(
+    "http://localhost:8090/api/review/objects",
+    params={"source_id": "src_1234567890ab"},
 )
-similar_objects = response.json()["data"]
+objects = response.json()["data"]
+print(objects[0]["category_name"])
 ```
 
-### Model Evaluation
+### Export Dataset
 
 ```python
-# Evaluate detection performance
 response = httpx.post(
-    "http://localhost:8000/evaluate/detection",
-    json={
-        "predictions": [...],
-        "ground_truth": [...],
-        "iou_threshold": 0.5
-    }
+    "http://localhost:8090/api/export",
+    data={
+        "dataset_name": "my_dataset",
+        "export_format": "yolo",
+        "only_validated": "true",
+    },
 )
-metrics = response.json()["data"]
-print(f"mAP: {metrics['mAP']:.3f}")
+export_info = response.json()
+print(export_info["download_url"])
 ```
 
 ---
@@ -257,14 +211,13 @@ print(f"mAP: {metrics['mAP']:.3f}")
 ## Testing
 
 ```bash
-# Run all tests
-pytest tests/ -v
+# Run the MVP baseline tests
+pytest tests/test_mvp_app.py tests/test_mvp_detector.py tests/test_mvp_segmenter.py tests/test_mvp_e2e.py -q
+```
 
-# Run with coverage
-pytest tests/ --cov=services --cov-report=html
-
-# Test results
-# 120 tests passing (unit + integration)
+```bash
+# Run the project-memory regression test
+pytest tests/test_project_memory.py -q
 ```
 
 ---

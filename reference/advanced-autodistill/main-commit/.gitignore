@@ -1,0 +1,102 @@
+# Project specific
+eventerrorlog.txt
+mcp.log
+mcp.db
+organize_project.py
+cleanup_project.sh
+.taskmasterconfig
+roo.modes
+.windsurfrules
+taskmaster-mcp.json
+mcp.db
+
+# Data directories - exclude by default, but keep structure
+data/*
+!data/.gitkeep
+!data/README.md
+
+# Model files - large binary files
+*.pt
+*.pth
+*.onnx
+*.bin
+models/*
+!models/.gitkeep
+!models/README.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment - but allow tracking modified package files
+# Modified package modules should be explicitly added with git add -f path/to/modified/file.py
+venv/
+ENV/
+env/
+bin/
+lib/
+lib64/
+include/
+share/
+pyvenv.cfg
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/*
+!logs/.gitkeep
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+
+# Editor directories and files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Task files
+tasks.json
+tasks/
+.cursor/
+.roo/
+runs/
+
+# Personal information
+**/personal_info.txt
+**/credentials.json
+**/api_keys.json
+
+# Ignore contents of data directories, but keep the directories
+test_category/images/*
+!test_category/images/.gitkeep
+test_category/support-set/*
+!test_category/support-set/.gitkeep 

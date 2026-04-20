@@ -1,0 +1,26 @@
+{
+  "method1": {
+    "car": "vehicle",
+    "fence_person": "barrier",
+    "sidewalk": "path",
+    "traffic cone": "traffic_sign"
+  },
+  "method2": {
+    "car": "car",
+    "fence_person": "fence_person",
+    "sidewalk": "sidewalk",
+    "traffic cone": "traffic_cone"
+  },
+  "method3": {
+    "car": "moving_object",
+    "fence_person": "static_object",
+    "sidewalk": "static_object",
+    "traffic cone": "static_object"
+  },
+  "method4": {
+    "car": "high_priority",
+    "fence_person": "medium_priority",
+    "sidewalk": "low_priority",
+    "traffic cone": "medium_priority"
+  }
+} 

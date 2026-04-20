@@ -1,0 +1,47 @@
+가상환경 설치 python 3.10 기준
+
+cudatoolkit 12.4 설치
+wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+sudo apt-get -y install cuda-toolkit-12-4
+
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+
+CUDNN 9.0 이상
+의존성 패키지 설치
+https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/
+wget
+https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/libcudnn9-cuda-12_9.1.1.17-1_amd64.deb
+sudo dpkg -i libcudnn9-cuda-12_9.1.1.17-1_amd64.deb
+
+wget
+https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/libcudnn9-dev-cuda-12_9.1.1.17-1_amd64.deb
+sudo dpkg -i libcudnn9-dev-cuda-12_9.1.1.17-1_amd64.deb
+
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/libcudnn9-static-cuda-12_9.1.1.17-1_amd64.deb
+sudo dpkg -i libcudnn9-static-cuda-12_9.1.1.17-1_amd64.deb
+
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cudnn9-cuda-12-4_9.1.1.17-1_amd64.deb
+sudo dpkg -i cudnn9-cuda-12_9.1.1.17-1_amd64.deb
+
+pip3 install opencv-python
+pip3 install matplotlib
+pip3 install pyyaml
+pip3 install wheel
+pip3 install autodistill
+pip3 install autodistill-grounded-sam-2
+pip3 install autodistill-yolov8
+pip3 install autodistill-florence-2
+
+flash_attn 설치
+https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+flash_attn은 이 경로를 통해 다운로드하고 설치를 진행한다.
+
+위 내용대로 반드시 순서대로 설치 진행
+
+===================
+git clone https://github.com/facebookresearch/segment-anything-2.git
+cd segment-anything-2
+pip install -e ".[demo]"
+
