@@ -10,13 +10,17 @@ Before major work, read these in order:
 
 1. [docs/progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — single time-ordered feed of development, research and decisions. Start here for current context.
 2. [docs/progress/LEARNINGS.md](/home/coffin/dev/AgenticLabeling/docs/progress/LEARNINGS.md) — curated candidate general principles (draft/validated/promoted)
-3. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
-4. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-5. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-6. [docs/standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md) — the meta-loop that turns friction into reusable rules
-7. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+3. [docs/concepts/README.md](/home/coffin/dev/AgenticLabeling/docs/concepts/README.md) — concept hub (single source of truth for explanations)
+4. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
+5. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+6. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+7. [docs/standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md) — the meta-loop that turns friction into reusable rules
+8. [docs/standards/concepts-protocol.md](/home/coffin/dev/AgenticLabeling/docs/standards/concepts-protocol.md) — concept hub rules (no explanation duplication)
+9. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
 
-When writing a WORKLOG entry (any tag), apply learn-from-friction Rule 1.1: check whether the entry exposes a general, non-obvious, reusable rule. If it passes the four-question gate, append a draft to `docs/progress/LEARNINGS.md` and link it from the WORKLOG entry's Details.
+When writing a WORKLOG entry (any tag):
+1. Apply learn-from-friction Rule 1.1: check whether the entry exposes a general, non-obvious, reusable rule. If it passes the four-question gate, append a draft to `docs/progress/LEARNINGS.md` and link it from the entry's Details.
+2. Apply concepts-protocol Rule 4: check whether the entry leans on a technical concept. If it already has a concept file, link to it from Details; if not, consider creating a stub under `docs/concepts/` and delegate the explanation there. Do not duplicate concept content in entry bodies.
 
 ## Active Product Boundary
 

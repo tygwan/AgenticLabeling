@@ -26,9 +26,12 @@
 
 **LEARNING 후보 자기 점검 (의무)**: 각 entry를 쓸 때 [learn-from-friction.md](../standards/learn-from-friction.md) Rule 1.1·Rule 2에 따라 "이 작업에서 뽑을 general 원칙이 있나?"를 자기 점검한다. 4문항 게이트 중 2개 이상 YES면 [LEARNINGS.md](LEARNINGS.md) 상단에 draft로 append하고 여기 Details에 링크한다. 애매하면 기록하지 말라 — noise는 가치를 죽인다.
 
+**Concept 참조·생성 자기 점검 (의무)**: [concepts-protocol.md](../standards/concepts-protocol.md) Rule 4에 따라 "이 entry가 기대는 기술·개념이 있나?"를 자기 점검한다. 이미 [docs/concepts/](../concepts/README.md) 에 있으면 Details에 `Concept: [링크]` 추가. 없으면 Rule 2 4문항 게이트 통과 시 concept 파일 stub 생성 후 링크. **entry 본문에 개념 설명을 중복해서 쓰지 말 것** — concept로 위임한다.
+
 상세 프로토콜·규칙은:
 
 - [docs/standards/learn-from-friction.md](../standards/learn-from-friction.md) — 마찰 → 일반 원칙 루프
+- [docs/standards/concepts-protocol.md](../standards/concepts-protocol.md) — 개념 허브 규칙
 - [docs/standards/research-observation-protocol.md](../standards/research-observation-protocol.md)
 - [docs/standards/model-inspection-conventions.md](../standards/model-inspection-conventions.md)
 

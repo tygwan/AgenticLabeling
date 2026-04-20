@@ -67,42 +67,21 @@ BF16 median speedup: **1.03×** (FP32 대비 ~3.3 % 단축)
 
 ## Interpretation
 
-### H1 (memory) — **확인**
-BF16이 VRAM을 정확히 절반으로 줄인다는 이론치(parameter = 2 bytes)가 그대로 관찰됐다. 모델 로드 시점뿐 아니라 peak VRAM도 같은 비율로 감소한다. 이는 activation/KV-cache도 BF16로 산출되기 때문이다. `use_cache=False` 설정임에도 generate 중 중간 텐서들이 모두 BF16이라 peak가 절반으로 떨어졌다.
+해석(개념 수준의 설명)은 [docs/concepts/ml/bf16-precision.md](../../../../docs/concepts/ml/bf16-precision.md) 의 Concept framework 섹션으로 위임됨. 이 observation의 수치·측정은 같은 concept 파일의 `Evidence in this project` 섹션 1-4 번에 기여한다.
 
-### H2 (speed) — **기각에 가까움. 본 조건에서는 이득이 미미**
-예상한 1.5–2× speedup 대신 1.03×만 관찰됐다. 유력한 원인 세 가지:
+이 observation에 **국한된 결정**만 아래에 남긴다:
 
-1. **`attn_implementation="eager"` 로 설정됨**. HuggingFace의 eager attention은 vanilla PyTorch matmul/softmax로 구현되며, FlashAttention / SDPA와 달리 Tensor Core 친화적인 fused kernel을 사용하지 않는다. BF16의 실제 속도 이점은 Tensor Core의 BF16 matmul 처리량이 FP32의 2–8×에서 나오는데, eager 구현은 이 경로를 거의 활용하지 못할 가능성이 있다.
-2. **Florence-2-base는 작은 모델** (~230M params, VRAM 930 MB 수준). RTX 4090의 이론 FP32 성능이 82 TFLOPs로 이미 매우 빠르고, 작은 모델의 decode loop는 memory-bound보다 compute-bound가 될 여지가 있다. 모델이 커질수록 BF16 speedup이 실질화될 가능성.
-3. **Autoregressive decode가 sequential**. `num_beams=1, use_cache=False`로 KV-cache도 없는 순수 sequential 생성이고, `max_new_tokens=1024`지만 실제 출력은 38 토큰(early stop). 토큰마다 overhead가 있어 matmul 시간의 절대량 자체가 작다.
+- 이 cycle 이후 제품 dtype 기본값을 BF16로 전환 결정 (DECISION 링크: [WORKLOG 2026-04-20 FLORENCE_DTYPE](../../../../docs/progress/WORKLOG.md))
+- 속도 이득 원인 추적을 위한 후속 observation: attn_implementation 변경 · Florence-2-large 확장
 
-→ 이 셋 중 어느 것이 주된 원인인지는 후속 관찰에서 attention 구현을 바꿔가며 측정해야 확인 가능하다.
+## Evidence contribution
 
-### H3 (output stability) — **확인**
-레이블은 bit-exact로 동일. bbox는 최대 ~20 px(전체 높이의 0.7 %) 드리프트. 이는 BF16의 mantissa 7 bit 정밀도가 post_process_generation 중 `<loc_N>` 토큰(0..999 양자화) → 원본 이미지 좌표로의 scale-up에서 rounding boundary 인근에서만 다른 bucket으로 넘어가기 때문으로 해석된다. Labeling 품질상 실용적으로 무시 가능한 수준.
+이 observation이 `docs/concepts/ml/bf16-precision.md` 에 기여하는 evidence:
 
-재미있는 점: **가장 큰 drift(20 px)가 "두 번째 sky" 박스**에서 발생했다. sky는 경계가 모호(명확한 에지 없이 gradient로 섞임)해서 post_processor가 선택하는 <loc_N> 토큰이 BF16 precision에서는 다른 bucket으로 쉽게 넘어갔을 가능성. 이는 모델이 확신 없는 영역일수록 dtype 차이에 민감해진다는 가설로 연결된다.
-
-### Q1 — 다음 관찰 후보
-`attn_implementation="sdpa"` 또는 `attn_implementation="flash_attention_2"`(설치 시)로 바꿔 BF16 speedup이 실제 기대치대로 올라오는지 검증해야 한다. 제품 관점에서도 eager attention 고정은 RTX 4090의 Tensor Core를 낭비한다.
-
-### Q2 — **확인: drift는 decode 단계에서 이미 발생**
-
-`decoder/generate.output_ids`의 raw `.pt` 덤프를 로드해 bit-exact 비교했다. 결과: 두 실행의 output_ids는 **동일하지 않다**. 길이는 38 토큰으로 같지만, 인덱스 [16, 17, 27, 36]의 4개 토큰에서 차이가 있다:
-
-| idx | FP32 | BF16 | Δ |
-|---:|---:|---:|---:|
-| 16 | 50783 | 50782 | 1 |
-| 17 | 50742 | 50741 | 1 |
-| 27 | 50764 | 50763 | 1 |
-| 36 | 50484 | 50477 | 7 |
-
-네 토큰 모두 Florence-2의 위치 토큰 범위(`<loc_N>`, N ∈ [0, 999], 토큰 id ≈ 50269 + N). 즉 드리프트는 post_process 단계의 scale-up 연산에서만 발생한 것이 **아니라, decode 중 softmax argmax 경계 근처에서 BF16 정밀도로는 다른 위치 토큰이 선택된 결과**다.
-
-인덱스 36의 Δ=7은 다른 세 위치(Δ=1)보다 유독 크다. 이 토큰이 최종 sky box의 `y2` 경계를 결정하는 위치라면, 앞서 관찰된 bbox 최대 drift 19.71 px(0.7%)의 직접적인 원인이다. 모델이 경계에 **확신이 없는 영역일수록 BF16 precision 손실이 다른 output token으로 이어지는 경향**이 이 관찰로 뒷받침된다.
-
-함의: Florence-2 계열 모델의 BF16 drift는 "post-processing 양자화 잡음"이 아니라 "decode 분기점 변경"으로 이해해야 한다. 드리프트를 줄이고 싶다면 post_process를 건드리기보다 decoder 단계에서(예: 더 높은 temperature·beam search·stop-token 조건) 경계 근처 안정화 전략을 고려해야 한다.
+- **§Evidence 1 — VRAM 절반** : 모델 로드 후 930.86 → 474.53 MB (0.510×), peak 1270.55 → 650.08 MB (0.512×)
+- **§Evidence 2 — 속도 이득 미미** : generate median 176.14 ms → 170.41 ms (1.03×), eager attention 원인 가설
+- **§Evidence 3 — decode argmax boundary 분기** : output_ids 4 토큰 위치([0,16], [0,17], [0,27], [0,36])에서 다른 `<loc_N>` 선택. sky 박스의 20 px bbox drift와 연결.
+- **§Evidence 4 — 입력 dtype cast 필요** : Input type (float) and bias type (BFloat16) should be the same 에러 → detector가 model_dtype으로 cast (관련 evidence는 코드에서 오는 것이지만 본 observation에서 문제 재현됨)
 
 ## Decision
 

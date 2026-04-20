@@ -157,6 +157,25 @@ observation 폴더를 완성하는 것만으로는 **왜 그 실험을 했는지
 
 또한 observation 단계는 **LEARNING 후보가 발견되는 대표 분기점**이다 (특히 결과가 가설과 어긋날 때, bit-exact 비교로 divergence가 드러날 때, 새로운 제약/호환성 이슈가 발견될 때). Interpretation 섹션과 WORKLOG [RESEARCH] entry를 쓰면서 반드시 [learn-from-friction.md](learn-from-friction.md) Rule 2의 4문항 게이트로 자기 점검하고, 통과하는 항목은 [docs/progress/LEARNINGS.md](../progress/LEARNINGS.md) 에 draft로 append한다.
 
+## Rule 9. Interpretation은 concept 파일로 위임한다
+
+observation의 해석이 **일반화 가능한 개념** 성격을 띠면 report.md 의 `Interpretation` 섹션은 축소되어야 한다. 개념적 설명은 `docs/concepts/` 아래 해당 concept 파일로 위임하고, observation report에는 `Evidence contribution` 섹션만 남겨 **어느 concept의 어느 subsection에 무엇을 기여하는지** 명시한다.
+
+[concepts-protocol.md](concepts-protocol.md) 가 이 관계의 공식 규칙이다. 요점:
+
+- observation report는 **측정·관찰 사실**(shapes, stats, values, token diffs 등)과 **이번 cycle 고유의 결정**만 담는다.
+- 일반 개념 설명(예: "BF16이 decode argmax boundary에서 분기를 일으킨다")은 concept 파일의 `Concept framework` 섹션에 작성된다.
+- 이 observation 고유의 근거(예: "output_ids의 [0,16],[0,17],[0,27],[0,36] 위치에서 4 token 차이")는 concept 파일의 `Evidence in this project` 섹션에 **인용·링크 형태로 추가**된다.
+- report.md는 Interpretation 섹션을 짧게 두거나 "Evidence contribution" 목록으로 대체한다.
+
+이 규칙이 지켜지면 개념 설명이 여러 observation report에 중복되지 않고 `docs/concepts/` 가 유일한 synthesis hub가 된다. observation report는 원시 근거 문서로 불변 상태를 유지한다.
+
+### Post-observation gate 보강
+
+observation 완료 체크리스트에 아래 한 줄을 추가한다:
+
+- observation report의 Interpretation 내용 중 **개념적 설명**이 있으면 해당 concept 파일의 `Evidence in this project` 섹션에 이관됐고, report.md는 `Evidence contribution` 링크로 축소되었는가?
+
 ## 인덱싱
 
 `research/observations/INDEX.md`가 모든 관찰 항목을 최신순으로 모은다. 새 observation을 끝낼 때마다 한 줄을 추가한다:

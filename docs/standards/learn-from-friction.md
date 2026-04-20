@@ -80,6 +80,7 @@
 | **research-observation-protocol.md** | Rule 8에 따라 observation 완료 시 WORKLOG `[RESEARCH]` entry를 쓴다. 그 entry의 Found·Interpretation 섹션을 쓰면서 LEARNING 후보를 자기 점검한다. observation에서만 드러나는 일반 원칙이 특히 많다(예: bit-exact 비교). |
 | **docs/progress/WORKLOG.md** | 매 entry 작성 시 Rule 1.1을 따라 LEARNING 후보 체크. 후보가 있으면 LEARNINGS.md에 draft로 append, 본 entry의 Details에 `Related LEARNING` 링크 추가. |
 | **docs/progress/OPTIMIZATION-NOTES.md** | build-first 원칙 하의 최적화 후보 큐. LEARNING과 **목적이 다르다**: OPTIMIZATION-NOTES는 "build 끝난 뒤 성능 손볼 후보", LEARNINGS는 "마찰에서 뽑은 general 원칙". OPTIMIZATION 항목을 결국 act할 때 거기서 뽑히는 general 원칙이 있다면 LEARNINGS로 복사될 수 있다. |
+| **docs/concepts/** + **concepts-protocol.md** | LEARNING은 **명령형 규칙만** 담는다. 규칙의 배경·메커니즘·예시 설명은 해당 concept 파일로 위임하고 LEARNING 본문에는 `Related concept` 링크만 둔다. 한 LEARNING이 여러 concept을 참조할 수 있고, 한 concept이 여러 LEARNING의 배경이 될 수 있다. 중복 설명 금지. |
 | **docs/standards/ui-change-gate.md** 등 기존 standards | LEARNING이 promoted되면 기존 standard 문서의 섹션으로 편입되거나 신규 standard 파일로 올라간다. standards는 promoted LEARNINGS의 집합으로 성장한다. |
 
 ## Pre-record gate

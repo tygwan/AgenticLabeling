@@ -11,13 +11,17 @@ Before making broad changes, read these in order:
 
 1. [docs/progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — 가장 최근 개발·실험·결정 맥락 (최신순)
 2. [docs/progress/LEARNINGS.md](/home/coffin/dev/AgenticLabeling/docs/progress/LEARNINGS.md) — curated 일반 원칙 후보집 (draft/validated/promoted)
-3. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
-4. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-5. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-6. [docs/standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md) — 마찰 이벤트에서 일반 원칙을 뽑는 루프
-7. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+3. [docs/concepts/README.md](/home/coffin/dev/AgenticLabeling/docs/concepts/README.md) — 개념 허브 (설명의 single source of truth)
+4. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
+5. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+6. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+7. [docs/standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md) — 마찰 이벤트에서 일반 원칙을 뽑는 루프
+8. [docs/standards/concepts-protocol.md](/home/coffin/dev/AgenticLabeling/docs/standards/concepts-protocol.md) — 개념 허브 규칙 (설명 중복 금지)
+9. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
 
-**WORKLOG entry 작성 시 준수사항**: 매 `[DEV]`/`[RESEARCH]`/`[DECISION]` entry를 쓸 때 learn-from-friction Rule 1.1에 따라 "여기서 뽑을 LEARNING 후보 있나?"를 자기 점검한다. 품질 게이트 4문항 중 2개 이상 YES면 `docs/progress/LEARNINGS.md` 상단에 draft로 append하고 WORKLOG entry의 Details에 링크한다.
+**WORKLOG entry 작성 시 준수사항**:
+1. learn-from-friction Rule 1.1 — "여기서 뽑을 LEARNING 후보 있나?" 자기 점검. 게이트 통과 시 `docs/progress/LEARNINGS.md` 상단에 draft로 append 후 entry Details에 링크.
+2. concepts-protocol Rule 4 — "이 entry가 기대는 개념이 concept 파일에 있나? 없으면 stub 생성 가치 있나?" 자기 점검. 해당 concept 파일로 **위임** (entry 본문에 개념 설명 반복하지 말 것).
 
 ## Current Product Boundary
 
