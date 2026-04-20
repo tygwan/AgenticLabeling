@@ -23,6 +23,11 @@ class Settings:
     # Set to bfloat16 on Ampere/Ada (RTX 30/40, A100, H100) for ~2x speed and
     # half the VRAM without the overflow risk of float16. Valid: float32, bfloat16, float16.
     florence_dtype: str = os.getenv("FLORENCE_DTYPE", "float32")
+    # Florence-2 attention implementation. "eager" = vanilla PyTorch matmul/softmax
+    # (no Tensor Core fused kernel), "sdpa" = torch.nn.functional.scaled_dot_product_attention
+    # which dispatches to fused kernels on Ada/Ampere. MVP default kept at "eager" until
+    # the sdpa-on-Florence-2 observation confirms numerical equivalence.
+    florence_attn_impl: str = os.getenv("FLORENCE_ATTN_IMPL", "eager")
     sam3_checkpoint: str = os.getenv("SAM3_CHECKPOINT", "")
     sam3_version: str = os.getenv("SAM3_VERSION", "sam3")
 

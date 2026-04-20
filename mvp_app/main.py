@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-import html
 import io
 from pathlib import Path
 from typing import Optional
@@ -11,6 +10,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageDraw
 
 from .config import get_settings
@@ -18,6 +18,30 @@ from .detector import DetectionService
 from .registry import Registry
 from .segmenter import SegmentationService
 from .storage import init_storage, store_image_bytes
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+CATEGORY_COLORS = {
+    "person": "#ef4444",
+    "car": "#3b82f6",
+    "truck": "#8b5cf6",
+    "bicycle": "#f59e0b",
+    "motorcycle": "#ec4899",
+    "traffic_light": "#10b981",
+    "stop_sign": "#f97316",
+    "dog": "#14b8a6",
+    "backpack": "#a855f7",
+    "handbag": "#06b6d4",
+    "bench": "#84cc16",
+    "pallet": "#eab308",
+    "forklift": "#22c55e",
+    "worker": "#ef4444",
+    "shelf": "#64748b",
+    "box": "#f59e0b",
+    "road": "#475569",
+    "building": "#6366f1",
+    "sky": "#0ea5e9",
+}
 
 
 @asynccontextmanager
@@ -27,6 +51,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="AgenticLabeling MVP", version="0.1.0", lifespan=lifespan)
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 registry = Registry()
 detector = DetectionService()
 segmenter = SegmentationService()
@@ -48,40 +74,6 @@ def _xyxy_to_xywh(box: list[float], image_width: int, image_height: int) -> list
     x2 = max(x1, min(x2, image_width))
     y2 = max(y1, min(y2, image_height))
     return [x1, y1, max(0.0, x2 - x1), max(0.0, y2 - y1)]
-
-
-def _render_page(title: str, body: str) -> HTMLResponse:
-    page = f"""
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <title>{html.escape(title)}</title>
-      <style>
-        body {{ font-family: sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }}
-        main {{ max-width: 1200px; margin: 0 auto; }}
-        section, form, table {{ background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }}
-        input, button, select {{ padding: 0.6rem; margin: 0.2rem 0; }}
-        button {{ cursor: pointer; }}
-        .grid {{ display: grid; grid-template-columns: 280px 1fr 360px; gap: 1rem; }}
-        .image-compare {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }}
-        .image-card {{ background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 0.75rem; }}
-        .source-link {{ display: block; padding: 0.4rem 0; }}
-        img {{ max-width: 100%; border-radius: 12px; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        td, th {{ padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left; }}
-        .pill {{ display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #eee; }}
-      </style>
-    </head>
-    <body>
-      <main>
-        <h1>{html.escape(title)}</h1>
-        {body}
-      </main>
-    </body>
-    </html>
-    """
-    return HTMLResponse(page)
 
 
 def _render_source_overlay(source: dict, objects: list[dict], *, include_masks: bool) -> bytes:
@@ -134,23 +126,25 @@ def health() -> dict:
     }
 
 
+def _spa_shell() -> HTMLResponse:
+    """Serve the React UMD SPA shell from mvp_app/static/index.html.
+
+    Rewrites relative asset hrefs to absolute /static/ paths so the same HTML
+    works both when served by FastAPI and when inspected in-place during
+    development.
+    """
+    shell_path = STATIC_DIR / "index.html"
+    if not shell_path.is_file():
+        raise HTTPException(status_code=500, detail="SPA shell missing (mvp_app/static/index.html)")
+    html_text = shell_path.read_text(encoding="utf-8")
+    html_text = html_text.replace('href="styles.css"', 'href="/static/styles.css"')
+    html_text = html_text.replace('src="components/', 'src="/static/components/')
+    return HTMLResponse(html_text)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> HTMLResponse:
-    body = """
-    <section>
-      <h2>Upload And Auto Label</h2>
-      <form action="/upload" method="post" enctype="multipart/form-data">
-        <div><input type="file" name="image" accept="image/*" required /></div>
-        <div><input type="text" name="project_id" value="default-project" placeholder="Project ID" /></div>
-        <div><input type="text" name="classes" value="person,car,dog" placeholder="Comma separated classes" /></div>
-        <div><button type="submit">Run Auto Label</button></div>
-      </form>
-    </section>
-    <section>
-      <a href="/review">Open Review UI</a>
-    </section>
-    """
-    return _render_page("AgenticLabeling MVP", body)
+    return _spa_shell()
 
 
 @app.post("/upload")
@@ -339,94 +333,104 @@ def export_from_review(
 
 @app.get("/review", response_class=HTMLResponse)
 def review(source_id: Optional[str] = None, exported: Optional[str] = None) -> HTMLResponse:
-    sources = registry.list_sources()
-    if not source_id and sources:
-        source_id = sources[0]["source_id"]
-    source = registry.get_source(source_id) if source_id else None
-    objects = registry.list_objects(source_id=source_id) if source_id else []
+    _ = source_id, exported
+    return _spa_shell()
+
+
+@app.get("/api/review/workspace")
+def api_workspace() -> dict:
+    """Workspace view-model for the SPA. Returns sources with nested objects
+    in the shape the reference React components expect.
+    """
+    settings = get_settings()
+    _ = settings
+    sources_raw = registry.list_sources()
     stats = registry.get_stats()
 
-    sources_html = "".join(
-        f'<a class="source-link" href="/review?source_id={src["source_id"]}">{html.escape(src["file_name"])}</a>'
-        for src in sources
-    ) or "<p>No sources yet.</p>"
+    sources: list[dict] = []
+    projects_seen: dict[str, dict] = {}
 
-    if source:
-        image_html = (
-            f'<section><h2>{html.escape(source["file_name"])}</h2>'
-            f'<p>Segmentation backend: <span class="pill">{html.escape(segmenter.backend_name)}</span></p>'
-            '<div class="image-compare">'
-            f'<div class="image-card"><h3>Original</h3><img src="/api/assets/{source["source_id"]}" alt="source image" /></div>'
-            f'<div class="image-card"><h3>BBox Overlay</h3><img src="/api/assets/{source["source_id"]}/bbox-overlay" alt="bbox overlay" /></div>'
-            f'<div class="image-card"><h3>Segmentation Overlay</h3><img src="/api/assets/{source["source_id"]}/overlay" alt="segmentation overlay" /></div>'
-            '</div></section>'
-        )
-    else:
-        image_html = "<section><p>No source selected.</p></section>"
+    for src in sources_raw:
+        source_id = src["source_id"]
+        width = src.get("width") or 1
+        height = src.get("height") or 1
+        project_id = src.get("project_id") or "default-project"
+        objects_raw = registry.list_objects(source_id=source_id)
 
-    object_rows = []
-    for obj in objects:
-        status = "validated" if obj["is_validated"] else "pending"
-        approve = (
-            ""
-            if obj["is_validated"]
-            else (
-                f'<form action="/review/objects/{obj["object_id"]}/approve" method="post">'
-                f'<input type="hidden" name="source_id" value="{source_id}" />'
-                '<button type="submit">Approve</button></form>'
+        classes_set: set[str] = set()
+        approved = 0
+        for obj in objects_raw:
+            classes_set.add(obj.get("category_name") or "object")
+            if obj.get("is_validated"):
+                approved += 1
+
+        total_objs = len(objects_raw)
+        if total_objs == 0:
+            status = "pending"
+        elif approved == total_objs:
+            status = "validated"
+        else:
+            status = "in_review"
+
+        objects: list[dict] = []
+        for obj in objects_raw:
+            category = obj.get("category_name") or "object"
+            objects.append(
+                {
+                    "object_id": obj["object_id"],
+                    "category": category,
+                    "color": CATEGORY_COLORS.get(category, "#64748b"),
+                    "bbox": [
+                        (obj.get("bbox_x") or 0.0) / width,
+                        (obj.get("bbox_y") or 0.0) / height,
+                        (obj.get("bbox_w") or 0.0) / width,
+                        (obj.get("bbox_h") or 0.0) / height,
+                    ],
+                    "bbox_px": [
+                        obj.get("bbox_x") or 0.0,
+                        obj.get("bbox_y") or 0.0,
+                        obj.get("bbox_w") or 0.0,
+                        obj.get("bbox_h") or 0.0,
+                    ],
+                    "confidence": obj.get("confidence"),
+                    "validated": "approved" if obj.get("is_validated") else None,
+                    "mask_url": f"/api/masks/{obj['object_id']}" if obj.get("mask_path") else None,
+                }
             )
-        )
-        delete = (
-            f'<form action="/review/objects/{obj["object_id"]}/delete" method="post">'
-            f'<input type="hidden" name="source_id" value="{source_id}" />'
-            '<button type="submit">Delete</button></form>'
-        )
-        object_rows.append(
-            "<tr>"
-            f"<td>{html.escape(obj['category_name'])}</td>"
-            f"<td>{obj['confidence'] or 0:.2f}</td>"
-            f"<td>{obj['bbox_x']:.0f}, {obj['bbox_y']:.0f}, {obj['bbox_w']:.0f}, {obj['bbox_h']:.0f}</td>"
-            f"<td><span class='pill'>{status}</span></td>"
-            f"<td>{approve}{delete}</td>"
-            "</tr>"
-        )
-    objects_html = (
-        "<section><h2>Objects</h2><table><thead><tr>"
-        "<th>Category</th><th>Confidence</th><th>BBox (x,y,w,h)</th><th>Status</th><th>Actions</th>"
-        "</tr></thead><tbody>"
-        + "".join(object_rows)
-        + "</tbody></table></section>"
-    ) if objects else "<section><p>No objects for this source.</p></section>"
 
-    export_notice = (
-        f'<section><p>Last export ready: <a href="/api/export/download/{html.escape(exported)}">{html.escape(exported)}</a></p></section>'
-        if exported
-        else ""
-    )
+        sources.append(
+            {
+                "id": source_id,
+                "file_name": src.get("file_name") or source_id,
+                "url": f"/api/assets/{source_id}",
+                "width": width,
+                "height": height,
+                "status": status,
+                "project": project_id,
+                "classes": sorted(classes_set),
+                "uploaded_at": src.get("created_at"),
+                "objects": objects,
+            }
+        )
 
-    body = f"""
-    <section>
-      <p>Sources: {stats['sources']} | Objects: {stats['objects']} | Validated: {stats['validated_objects']}</p>
-    </section>
-    {export_notice}
-    <div class="grid">
-      <section><h2>Sources</h2>{sources_html}</section>
-      {image_html}
-      <section>
-        <h2>Export</h2>
-        <form action="/review/export" method="post">
-          <div><input type="text" name="dataset_name" value="mvp-dataset" /></div>
-          <div>
-            <select name="export_format">
-              <option value="yolo">YOLO</option>
-              <option value="coco">COCO</option>
-            </select>
-          </div>
-          <div><label><input type="checkbox" name="only_validated" checked /> Only validated</label></div>
-          <div><button type="submit">Export dataset</button></div>
-        </form>
-      </section>
-    </div>
-    {objects_html}
-    """
-    return _render_page("Review Workspace", body)
+        bucket = projects_seen.setdefault(
+            project_id, {"id": project_id, "name": project_id, "sources": 0, "validated": 0, "classes": set()}
+        )
+        bucket["sources"] += 1
+        if status == "validated":
+            bucket["validated"] += 1
+        bucket["classes"].update(classes_set)
+
+    projects = [
+        {"id": p["id"], "name": p["name"], "sources": p["sources"], "validated": p["validated"], "classes": sorted(p["classes"])}
+        for p in projects_seen.values()
+    ]
+
+    return {
+        "success": True,
+        "sources": sources,
+        "projects": projects,
+        "stats": stats,
+        "category_colors": CATEGORY_COLORS,
+        "segmentation_backend": segmenter.backend_name,
+    }

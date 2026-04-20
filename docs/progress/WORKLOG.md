@@ -33,6 +33,66 @@
 
 ## 2026-04-20
 
+### [DEV] UI 전체 구현 (Phase 0~4) — Reference SPA 포팅
+
+**What**:
+- `reference/ui_refer/` (React 18 UMD + Babel standalone, 빌드 체인 없음)을 `mvp_app/static/`으로 이식. FastAPI에 `/static` StaticFiles 마운트, `GET /`·`GET /review`는 SPA shell(`index.html`)을 서빙. 기존 서버 렌더링 HTML(`_render_page`) 제거.
+- 새 엔드포인트 `GET /api/review/workspace` 추가: 하나의 view-model로 sources + nested objects + projects + stats + category_colors + segmentation_backend를 한 번에 제공. 객체 좌표는 정규화 bbox로, 카테고리 색은 CATEGORY_COLORS 매핑으로, 상태는 `pending/in_review/validated`로 derived. 이 엔드포인트가 reference의 mock `data.jsx` (SOURCES)를 대체.
+- 신규 `mvp_app/static/components/api.jsx`: `fetchWorkspace`, `approveObject`, `deleteObject`, `uploadImage`, `exportDataset`, `fetchHealth` helpers + `useWorkspace()` 훅(최초 로드 + optimistic mutate/remove). App은 mount 시 workspace를 한 번 가져오고, 액션마다 mutate→API→실패 시 롤백 패턴.
+- Phase 1 Review: `ReviewWorkspace`가 API 기반 sources를 받고, `setValidated`는 localObjects 대신 `onUpdateObject(sourceId, objectId, action)` 콜백 → App이 API 호출. 빈 상태/소스 재선택(activeId 갱신)·키보드 단축키(JKAD/BML/←→/U) 그대로 동작.
+- Phase 2 Home: 드롭존이 실제 `/api/pipeline/auto-label`로 업로드 후 workspace reload. Stats 카드는 현 워크스페이스의 sources/objects/validated/validation-rate 4개로 교체. Projects는 workspace.projects (MVP derived). Recent runs는 mock 유지(Run 엔티티가 MVP에 없음).
+- Phase 3 Export: `/api/export` 호출 + 다운로드 링크 렌더. Summary는 workspace에서 파생(images/objects/classes/class-distribution). splits slider는 UI는 남아있지만 backend는 splits 미지원이라 tree 숫자만 시각적 표시. 
+- Phase 4 Settings: `/health`의 segmentation_backend·stats 기반 실제 상태 표시(Florence-2 loaded, SAM3 `sam3`/`box-fallback` 배지, Registry 통계). API keys/Team 섹션 제거(MVP 미구현). 테마·density·accent·panelOrder는 이미 TweaksPanel로 조정되고 localStorage에 persist.
+- 기존 form 기반 엔드포인트(`/upload`, `/review/objects/<id>/approve|delete`, `/review/export`)는 하위 호환용으로 유지.
+- 테스트 갱신: `test_mvp_app.py`, `test_mvp_e2e.py`가 서버 렌더링 HTML 문자열 대신 SPA shell 확인 + `/api/review/workspace` shape을 assert. 202 passed 유지.
+
+**Why**: UI는 다음 주요 workstream이고, 사용자가 reference 기반으로 시각·상호작용 투자를 이미 끝냄. Phase 2-4 백엔드 gap들은 derived mock으로 처리 가능해서 UI 전체 한 번에 이식하는 편이 맥락 유지·포트폴리오 가치 면에서 유리.
+
+**Result**:
+- `/`·`/review` 둘 다 SPA shell을 서빙, `/static/*` 으로 컴포넌트·CSS·이미지 에셋 제공
+- Review 워크스테이션 완전 동작 (3-pane, overlay 토글, 키보드 단축키, optimistic approve/delete)
+- Home에서 업로드 → 파이프라인 실행 → workspace 자동 갱신
+- Export에서 dataset zip 생성·다운로드
+- Settings에서 백엔드 상태·Registry 통계 실제 표시
+- 202 tests pass
+
+**Known gaps (reference와 차이 — follow-up 대상)**:
+- **Mask overlay 렌더링**: reference viewer가 `DeterministicBlob` 모의 블롭을 그림. 실제 `/api/masks/{object_id}` PNG를 canvas에 합성하는 로직 필요. bbox 오버레이는 이미 CSS/SVG 기반으로 동작.
+- **Recent runs**: MVP에 Run 엔티티 없음 (`RECENT_RUNS` mock 유지). 진짜 구현은 파이프라인 실행 이벤트를 DB에 적재하는 서버측 변경 필요.
+- **Export splits**: UI slider는 있지만 `/api/export`가 splits 파라미터 미지원. 백엔드 확장 필요.
+- **object.validated 'deleted'**: reference는 tri-state(null/approved/deleted), MVP는 현재 hard-delete. 소프트 삭제 도입은 `is_validated(bool)` → `validation_status(enum)` 스키마 마이그레이션 필요 (Phase 1.5, 유보).
+- **source.error**: 업로드 실패 추적 엔티티 없음. 현재 업로드 실패는 HomeScreen의 `lastError` local state로만 표시.
+- **Top bar "Filter" / "Batch approve"**: 버튼만 있고 기능 미연결 (후속 Batch Curation phase에서).
+- **Settings "API keys" / "Team"**: MVP 범위 밖이라 제거.
+
+**Details**:
+- 신규 파일: `mvp_app/static/index.html`, `mvp_app/static/styles.css`, `mvp_app/static/components/*.jsx`, `mvp_app/static/components/api.jsx`
+- 변경 파일: `mvp_app/main.py` (SPA shell, /api/review/workspace, CATEGORY_COLORS, 기존 `/review` 서버 렌더링 제거), `tests/test_mvp_app.py`, `tests/test_mvp_e2e.py`
+
+**Triggered by**: MVP Refactor Plan Phase 2 (Review Workspace UX) + UI reference-mapping Phase 1-4 + 사용자 "UI 전체 구현 시작" 지시
+**Triggers**: 위 Known gaps 각각 — 특히 mask overlay 실제 렌더링, Recent runs 실데이터, Export splits 백엔드, `validation_status` 스키마 마이그레이션
+
+---
+
+### [RESEARCH] Florence-2 `attn_implementation="sdpa"` 시도 → 불가
+
+**What**: `FLORENCE_ATTN_IMPL=sdpa` 환경변수와 `mvp_app/config.py`·`detector.py` 경로를 추가하고 BF16+SDPA 2x2 observation을 시도. 모델 초기화 시 transformers 내부 `_sdpa_can_dispatch` 체크가 `Florence2ForConditionalGeneration._supports_sdpa` 속성을 찾다가 실패.
+**Why**: 앞선 FP32 vs BF16 비교에서 BF16 speedup이 1.03×에 그친 원인 가설 중 "eager attention이 Tensor Core 경로 우회"를 검증하려고.
+**Found**:
+- Florence-2 custom modeling(`configuration_florence2.py`, `modeling_florence2.py`)이 transformers의 `_supports_sdpa` 프로토콜을 구현하지 않음.
+- 따라서 `attn_implementation="sdpa"`는 현 상태로 사용 불가. HF cache의 custom code를 패치하거나, 별도 Flash-Attention 설치+patch 루트로 가야 함.
+- 이것 자체가 **BF16 speedup 저조의 유력 원인 중 하나를 간접 확인**한다: 대안 attention 경로가 업스트림에서 막혀 있어 현 토폴로지에서는 Tensor Core 풀 속도 이득을 못 뽑는다.
+**Follow-ups**:
+- [ ] Florence-2-large 로 BF16 vs FP32 재측정 (모델이 클수록 eager도 일부 이득은 있을 수 있음)
+- [ ] HF cache custom code에 `_supports_sdpa = True` 패치 + PyTorch SDPA가 요구하는 attention 구현 교체 → 전제: transformers의 SDPA API에 맞춰 `LayerSelfAttention` forward 리팩터
+- [ ] Flash-Attention 2/3 경유 대안 (의존성 크고 Florence 커스텀 코드 수정 필요)
+**Details**: `mvp_app/config.py` `florence_attn_impl`, `mvp_app/detector.py` `attn_implementation=settings.florence_attn_impl`
+
+**Triggered by**: 위 DECISION 이전 RESEARCH(FP32 vs BF16)의 Follow-up Q1
+**Triggers**: 위 follow-ups (Florence-2-large 비교, custom code patch)
+
+---
+
 ### [DECISION] `FLORENCE_DTYPE` 환경변수 도입, 배포 기본값 BF16 채택
 
 **What**: `mvp_app/config.py`에 `florence_dtype` 설정 추가, `mvp_app/detector.py`에서 dtype resolver(`_resolve_dtype`) 통해 float32 / bfloat16 / float16 지원. 모델 로드 시 이 dtype으로 캐스트, 입력 `pixel_values`도 model dtype에 맞춰 캐스트. 테스트 202 pass 유지.

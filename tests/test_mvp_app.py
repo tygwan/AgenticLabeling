@@ -56,8 +56,25 @@ def test_mvp_home_and_upload(monkeypatch, tmp_path):
         assert "object_ids" in payload
         assert "segmentation_backend" in payload
 
+        # /review now serves the SPA shell; content is rendered client-side.
         review = client.get("/review")
         assert review.status_code == 200
-        assert "Review Workspace" in review.text
-        assert "BBox Overlay" in review.text
-        assert "Segmentation Overlay" in review.text
+        assert "AgenticLabeling" in review.text
+        assert "/static/styles.css" in review.text
+
+        # The workspace data that the SPA fetches post-mount.
+        workspace = client.get("/api/review/workspace")
+        assert workspace.status_code == 200
+        wk = workspace.json()
+        assert wk["success"] is True
+        assert any(s["id"] == payload["source_id"] for s in wk["sources"])
+        assert wk["sources"][0]["url"].startswith("/api/assets/")
+
+        # Overlay endpoints still produce PNGs (used by the Viewer component).
+        source_id = payload["source_id"]
+        bbox_overlay = client.get(f"/api/assets/{source_id}/bbox-overlay")
+        assert bbox_overlay.status_code == 200
+        assert bbox_overlay.headers["content-type"] == "image/png"
+        seg_overlay = client.get(f"/api/assets/{source_id}/overlay")
+        assert seg_overlay.status_code == 200
+        assert seg_overlay.headers["content-type"] == "image/png"

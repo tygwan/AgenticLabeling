@@ -74,10 +74,19 @@ def test_mvp_image_review_and_export(monkeypatch, tmp_path):
         assert export_payload["image_count"] == 1
         assert export_payload["object_count"] == 1
 
+        # /review serves the SPA shell; UI renders overlays client-side.
         review = client.get(f"/review?source_id={source_id}")
         assert review.status_code == 200
-        assert "BBox Overlay" in review.text
-        assert "Segmentation Overlay" in review.text
+        assert "AgenticLabeling" in review.text
+
+        workspace = client.get("/api/review/workspace")
+        assert workspace.status_code == 200
+        wk = workspace.json()
+        source_ids = [s["id"] for s in wk["sources"]]
+        assert source_id in source_ids
+        chosen = next(s for s in wk["sources"] if s["id"] == source_id)
+        assert chosen["status"] in ("pending", "in_review", "validated")
+        assert chosen["objects"][0]["validated"] == "approved"
 
         export_zip = tmp_path / "data" / "exports" / "e2e-dataset.zip"
         assert export_zip.exists()

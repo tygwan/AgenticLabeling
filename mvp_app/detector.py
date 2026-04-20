@@ -94,7 +94,7 @@ class DetectionService:
             settings.florence_model_id,
             trust_remote_code=True,
             dtype=self._resolve_dtype(settings.florence_dtype),
-            attn_implementation="eager",
+            attn_implementation=settings.florence_attn_impl,
         ).to(self.device).eval()
         self._processor = AutoProcessor.from_pretrained(
             settings.florence_model_id,

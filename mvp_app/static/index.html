@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AgenticLabeling — Workstation</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="components/icons.jsx"></script>
+<script type="text/babel" src="components/data.jsx"></script>
+<script type="text/babel" src="components/api.jsx"></script>
+<script type="text/babel" src="components/shell.jsx"></script>
+<script type="text/babel" src="components/viewer.jsx"></script>
+<script type="text/babel" src="components/review.jsx"></script>
+<script type="text/babel" src="components/home.jsx"></script>
+<script type="text/babel" src="components/screens.jsx"></script>
+<script type="text/babel">
+const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
+  "theme": "light",
+  "accent": "#0d9488",
+  "density": "roomy",
+  "panelOrder": "std",
+  "objectListStyle": 1,
+  "showBox": true,
+  "showMask": true,
+  "showLabel": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [route, setRoute] = React.useState(() => localStorage.getItem('al.route') || 'review');
+  const [settings, setSettings] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem('al.settings');
+      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+    } catch { return DEFAULT_SETTINGS; }
+  });
+  const [tweaksOpen, setTweaksOpen] = React.useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
+
+  // Persist
+  React.useEffect(() => { localStorage.setItem('al.route', route); }, [route]);
+  React.useEffect(() => {
+    localStorage.setItem('al.settings', JSON.stringify(settings));
+    document.documentElement.setAttribute('data-theme', settings.theme);
+    document.documentElement.setAttribute('data-density', settings.density);
+    document.documentElement.style.setProperty('--c-accent', settings.accent);
+    document.documentElement.style.setProperty('--c-accent-weak',
+      `color-mix(in oklab, ${settings.accent} 12%, transparent)`);
+  }, [settings]);
+
+  // Global shortcuts
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.matches('input, textarea, select')) return;
+      if (e.key === '?') { e.preventDefault(); setShortcutsOpen(o => !o); }
+      else if (e.key === 'Escape') { setTweaksOpen(false); setShortcutsOpen(false); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Edit mode bridge
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const d = e.data || {};
+      if (d.type === '__activate_edit_mode') setTweaksOpen(true);
+      else if (d.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  React.useEffect(() => {
+    window.parent.postMessage({
+      type: '__edit_mode_set_keys',
+      edits: settings,
+    }, '*');
+  }, [settings]);
+
+  const routeMeta = {
+    home:     { title: 'Home',              sub: 'Ingest new sources and monitor runtime',        crumbs: ['AgenticLabeling'] },
+    review:   { title: 'Review workspace',  sub: 'Inspect detections, approve or delete objects', crumbs: ['AgenticLabeling', 'urban-mobility-v3'] },
+    export:   { title: 'Export dataset',    sub: 'Package validated objects for training',         crumbs: ['AgenticLabeling', 'urban-mobility-v3'] },
+    settings: { title: 'Settings',          sub: 'Models, paths, workspace defaults',              crumbs: ['AgenticLabeling'] },
+  }[route];
+
+  const topRight = (
+    <>
+      {route === 'review' && (
+        <>
+          <button className="btn ghost sm" onClick={() => setShortcutsOpen(true)}>
+            <IconKeyboard size={14} /> Shortcuts <Kbd>?</Kbd>
+          </button>
+          <button className="btn ghost sm"><IconFilter size={14} /> Filter</button>
+          <button className="btn primary sm"><IconCheck size={14} stroke={2.5} /> Batch approve</button>
+        </>
+      )}
+      {route === 'home' && (
+        <button className="btn sm"><IconPlay size={12} /> Recent runs</button>
+      )}
+      {route === 'export' && (
+        <button className="btn ghost sm">Export history</button>
+      )}
+    </>
+  );
+
+  const workspace = useWorkspace();
+  const liveSources = workspace.data?.sources?.length ? workspace.data.sources : SOURCES;
+
+  const handleUpdateObject = React.useCallback(async (sourceId, objectId, action) => {
+    // Optimistic update: reflect new state immediately, roll back on failure.
+    if (action === 'approved') {
+      workspace.mutateObject(sourceId, objectId, { validated: 'approved' });
+      try { await API.approveObject(objectId); }
+      catch (e) { workspace.mutateObject(sourceId, objectId, { validated: null }); console.error(e); }
+    } else if (action === 'deleted') {
+      workspace.mutateObject(sourceId, objectId, { validated: 'deleted' });
+      try {
+        await API.deleteObject(objectId);
+        workspace.removeObject(sourceId, objectId);
+      } catch (e) { workspace.mutateObject(sourceId, objectId, { validated: null }); console.error(e); }
+    } else if (action === null || action === 'pending') {
+      // Un-validate is not a server op today (no rollback endpoint); keep UI state only.
+      workspace.mutateObject(sourceId, objectId, { validated: null });
+    }
+  }, [workspace]);
+
+  let body;
+  if (workspace.loading && route !== 'settings') {
+    body = <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--c-muted)' }}>Loading workspace…</div>;
+  } else if (workspace.error && route === 'review') {
+    body = <div style={{ padding: '2rem', color: 'var(--c-err)' }}>Failed to load workspace: {workspace.error}</div>;
+  } else if (route === 'home') {
+    body = <HomeScreen onGoReview={() => setRoute('review')} onRunPipeline={workspace.reload} workspace={workspace.data} />;
+  } else if (route === 'review') {
+    body = <ReviewWorkspace
+      sources={liveSources}
+      settings={settings}
+      panelOrder={settings.panelOrder}
+      onUpdateObject={handleUpdateObject}
+    />;
+  } else if (route === 'export') {
+    body = <ExportScreen workspace={workspace.data} />;
+  } else if (route === 'settings') {
+    body = <SettingsScreen />;
+  }
+
+  return (
+    <AppShell
+      route={route}
+      setRoute={setRoute}
+      tweaksOn={tweaksOpen}
+      onOpenTweaks={() => setTweaksOpen(o => !o)}
+      onOpenShortcuts={() => setShortcutsOpen(o => !o)}
+    >
+      <TopBar title={routeMeta.title} subtitle={routeMeta.sub} crumbs={routeMeta.crumbs} right={topRight} />
+      <div data-screen-label={route} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {body}
+      </div>
+      <TweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)} settings={settings} setSettings={setSettings} />
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
