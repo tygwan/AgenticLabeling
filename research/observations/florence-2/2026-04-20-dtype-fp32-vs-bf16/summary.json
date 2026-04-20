@@ -1,0 +1,88 @@
+{
+  "date": "2026-04-20",
+  "slug": "dtype-fp32-vs-bf16",
+  "model": "microsoft/Florence-2-base",
+  "type": "comparison",
+  "source_observations": [
+    "../2026-04-20-florence2-base-fp32/summary.json",
+    "../2026-04-20-florence2-base-bf16/summary.json"
+  ],
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "capability": [8, 9],
+    "vram_total_bytes": 25757220864
+  },
+  "software": {
+    "torch": "2.11.0+cu126",
+    "transformers": "4.57.6",
+    "triton": "triton-windows 3.6.0.post26"
+  },
+  "inputs": {
+    "image": "data/images/test_street.jpg",
+    "image_sha256": "8414df421ee3ea605fdd94cf7ee267cf67c5634b76a92aac9b228f281353942d",
+    "classes": ["car", "person", "road", "building", "sky"]
+  },
+  "measurement_protocol": {
+    "warmup_runs": 1,
+    "measure_runs": 3,
+    "cuda_synchronize": true,
+    "generation_config": {
+      "do_sample": false,
+      "num_beams": 1,
+      "max_new_tokens": 1024,
+      "use_cache": false
+    },
+    "attn_implementation": "eager"
+  },
+  "metrics": {
+    "vram_bytes": {
+      "fp32": {
+        "model_after_load": 930857984,
+        "peak_during_generate": 1270545408
+      },
+      "bf16": {
+        "model_after_load": 474529280,
+        "peak_during_generate": 650079744
+      },
+      "ratio_bf16_over_fp32": {
+        "model_after_load": 0.510,
+        "peak_during_generate": 0.512
+      }
+    },
+    "generate_wallclock_ms": {
+      "fp32": {
+        "runs": [176.13680008798838, 175.08429987356067, 179.55499980598688],
+        "median": 176.14,
+        "min": 175.08,
+        "max": 179.55
+      },
+      "bf16": {
+        "runs": [170.5736997537315, 170.40849989280105, 164.54040026292205],
+        "median": 170.41,
+        "min": 164.54,
+        "max": 170.57
+      },
+      "bf16_speedup_median": 1.03
+    },
+    "output_stability": {
+      "labels_identical": true,
+      "labels": ["car", "person", "road", "building", "sky", "sky"],
+      "output_ids_length": 38,
+      "bbox_max_px_drift": 19.71,
+      "bbox_max_drift_box_index": 5,
+      "bbox_max_drift_label": "sky",
+      "bbox_per_box_max_drift_px": [0.0, 2.82, 0.0, 2.82, 0.0, 19.71]
+    }
+  },
+  "conclusions": {
+    "memory_hypothesis_confirmed": true,
+    "speed_hypothesis_confirmed": false,
+    "output_stability_hypothesis_confirmed": true,
+    "speed_root_cause_candidates": [
+      "attn_implementation='eager' bypasses Tensor Core kernels",
+      "Florence-2-base is compute-bound at this size / RTX 4090",
+      "Sequential decode with use_cache=False amortizes small per-token overhead"
+    ],
+    "decision": "Adopt FLORENCE_DTYPE=bfloat16 going forward for VRAM savings; attention implementation revisited in follow-up observation."
+  }
+}

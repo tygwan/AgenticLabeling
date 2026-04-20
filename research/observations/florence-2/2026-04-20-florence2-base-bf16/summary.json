@@ -1,0 +1,711 @@
+{
+  "model_slug": "florence-2",
+  "slug": "florence2-base-bf16",
+  "commit": "2e9b82682b3f3565f75209cb63523500f308ef51",
+  "python_version": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "key_packages": {
+    "torch": "2.11.0+cu126",
+    "transformers": "4.57.6",
+    "numpy": "2.4.4",
+    "PIL": "12.2.0"
+  },
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 4090",
+    "capability": [
+      8,
+      9
+    ],
+    "total_memory_bytes": 25756696576
+  },
+  "model_ids": {
+    "florence": "microsoft/Florence-2-base",
+    "sam3_checkpoint": ""
+  },
+  "florence_dtype": "bfloat16",
+  "fake_models": false,
+  "inputs": [
+    {
+      "path": "data\\images\\test_street.jpg",
+      "sha256": "8414df421ee3ea605fdd94cf7ee267cf67c5634b76a92aac9b228f281353942d"
+    }
+  ],
+  "classes": [
+    "car",
+    "person",
+    "road",
+    "building",
+    "sky"
+  ],
+  "florence_result": {
+    "boxes": [
+      [
+        0.7919999957084656,
+        1.4079999923706055,
+        1580.0400390625,
+        2811.77587890625
+      ],
+      [
+        731.0159912109375,
+        1175.6800537109375,
+        813.3839721679688,
+        1330.5599365234375
+      ],
+      [
+        0.7919999957084656,
+        1071.488037109375,
+        1581.6240234375,
+        2811.77587890625
+      ],
+      [
+        0.7919999957084656,
+        1.4079999923706055,
+        407.8800048828125,
+        1392.511962890625
+      ],
+      [
+        247.89599609375,
+        1.4079999923706055,
+        1581.6240234375,
+        863.10400390625
+      ],
+      [
+        249.47999572753906,
+        1.4079999923706055,
+        1581.6240234375,
+        587.135986328125
+      ]
+    ],
+    "labels": [
+      "car",
+      "person",
+      "road",
+      "building",
+      "sky",
+      "sky"
+    ],
+    "scores": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "image_size": {
+      "width": 1584,
+      "height": 2816
+    }
+  },
+  "florence_profile": {
+    "dtype": "bfloat16",
+    "device": "cuda",
+    "model_vram_bytes_after_load": 474534400,
+    "model_param_dtype": "bfloat16",
+    "generate_ms_runs": [
+      170.5736997537315,
+      170.40849989280105,
+      164.54040026292205
+    ],
+    "generate_ms_median": 170.40849989280105,
+    "generate_ms_min": 164.54040026292205,
+    "generate_ms_max": 170.5736997537315,
+    "peak_vram_bytes_during_generate": 650082816
+  },
+  "sam_result_shape_only": {
+    "masks_count": 6,
+    "image_size": {
+      "width": 1584,
+      "height": 2816
+    }
+  },
+  "observation_points": [
+    {
+      "name": "florence-2/processor/inputs.image_bytes",
+      "type": "bytes",
+      "repr": "b'\\xff\\xd8\\xff\\xe0\\x00\\x10JFIF\\x00\\x01\\x01\\x00\\x00\\x01\\x00\\x01\\x00\\x00\\xff\\xfe\\x00\\x1fCompressed by jpeg-recompress\\xff\\xdb\\x00\\x84\\x00\\x04\\x04\\x04\\x04\\x04\\x04\\x04\\x04\\x04\\x04\\x06\\x06\\x05\\x06\\x06\\x08\\"
+    },
+    {
+      "name": "florence-2/processor/inputs.classes",
+      "type": "list",
+      "length": 5,
+      "element_type": "str"
+    },
+    {
+      "name": "florence-2/processor/inputs.PIL_image",
+      "type": "PIL.Image.Image",
+      "mode": "RGB",
+      "size": [
+        1584,
+        2816
+      ]
+    },
+    {
+      "name": "florence-2/processor/inputs/input_ids",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        27
+      ],
+      "dtype": "int64",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.0,
+        "max": 22810.0,
+        "mean": 2234.4814453125,
+        "std": 6044.05517578125
+      },
+      "sample_head": [
+        0.0,
+        574.0,
+        22486.0,
+        5.0
+      ],
+      "sample_tail": [
+        8.0,
+        6360.0,
+        4.0,
+        2.0
+      ]
+    },
+    {
+      "name": "florence-2/processor/inputs/attention_mask",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        27
+      ],
+      "dtype": "int64",
+      "device": "cuda:0",
+      "stats": {
+        "min": 1.0,
+        "max": 1.0,
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "sample_head": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "sample_tail": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "name": "florence-2/processor/inputs/pixel_values",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        3,
+        768,
+        768
+      ],
+      "dtype": "bfloat16",
+      "device": "cuda:0",
+      "stats": {
+        "min": -2.125,
+        "max": 2.640625,
+        "mean": 0.5527766942977905,
+        "std": 0.9518887996673584
+      },
+      "sample_head": [
+        1.2421875,
+        1.2421875,
+        1.2421875,
+        1.2421875
+      ],
+      "sample_tail": [
+        -0.21875,
+        -0.09619140625,
+        -0.0791015625,
+        -0.462890625
+      ]
+    },
+    {
+      "name": "florence-2/decoder/generate.output_ids",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        38
+      ],
+      "dtype": "int64",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.0,
+        "max": 51267.0,
+        "mean": 38877.8671875,
+        "std": 20318.359375
+      },
+      "sample_head": [
+        2.0,
+        0.0,
+        250.0,
+        1345.0
+      ],
+      "sample_tail": [
+        50269.0,
+        51267.0,
+        50477.0,
+        2.0
+      ]
+    },
+    {
+      "name": "florence-2/decoder/generate.output_text",
+      "type": "str",
+      "length": 276,
+      "sample_head": "</s><s>A photo<loc_0><loc_0><loc_998><loc_998>car<loc_0><loc_0><loc_997><loc_998>person<loc_461><loc_417><loc_513><loc_4",
+      "sample_tail": "_998>building<loc_0><loc_0><loc_257><loc_494>sky<loc_156><loc_0><loc_998><loc_306><loc_157><loc_0><loc_998><loc_208></s>"
+    },
+    {
+      "name": "florence-2/post_process/result",
+      "type": "dict",
+      "keys": [
+        "<CAPTION_TO_PHRASE_GROUNDING>"
+      ]
+    },
+    {
+      "name": "florence-2/post_process/bboxes",
+      "type": "list",
+      "length": 7,
+      "element_type": "list"
+    },
+    {
+      "name": "florence-2/post_process/labels",
+      "type": "list",
+      "length": 7,
+      "element_type": "str"
+    },
+    {
+      "name": "florence-2/output/result",
+      "type": "dict",
+      "keys": [
+        "boxes",
+        "labels",
+        "scores",
+        "image_size"
+      ]
+    },
+    {
+      "name": "sam3/processor/inputs.image_np",
+      "type": "np.ndarray",
+      "shape": [
+        2816,
+        1584,
+        3
+      ],
+      "dtype": "uint8",
+      "stats": {
+        "min": 0.0,
+        "max": 255.0,
+        "mean": 146.29855887533,
+        "std": 55.04529427129542
+      },
+      "sample_head": [
+        196,
+        202,
+        214,
+        196
+      ],
+      "sample_tail": [
+        92,
+        83,
+        84,
+        88
+      ]
+    },
+    {
+      "name": "sam3/processor/inputs.boxes_xyxy_px",
+      "type": "list",
+      "length": 6,
+      "element_type": "list"
+    },
+    {
+      "name": "sam3/processor/backend_name",
+      "type": "str",
+      "value": "sam3"
+    },
+    {
+      "name": "sam3/processor/state_after_set_image",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out"
+      ]
+    },
+    {
+      "name": "sam3/processor/box_norm[0]",
+      "type": "list[float]",
+      "value": [
+        0.49900001232897995,
+        0.4994999784976244,
+        0.9970000246633784,
+        0.9979999570006673
+      ],
+      "source_box_xyxy_px": [
+        0.7919999957084656,
+        1.4079999923706055,
+        1580.0400390625,
+        2811.77587890625
+      ]
+    },
+    {
+      "name": "sam3/mask_head/state[0]_after_prompt",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out",
+        "geometric_prompt",
+        "masks_logits",
+        "masks",
+        "boxes",
+        "scores"
+      ]
+    },
+    {
+      "name": "sam3/mask_head/masks_logits[0]",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        1,
+        2816,
+        1584
+      ],
+      "dtype": "bool",
+      "device": "cuda:0"
+    },
+    {
+      "name": "sam3/mask_head/scores[0]",
+      "type": "torch.Tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.9916887879371643,
+        "max": 0.9916887879371643,
+        "mean": 0.9916887879371643,
+        "std": NaN
+      },
+      "sample": [
+        0.9916887879371643
+      ]
+    },
+    {
+      "name": "sam3/processor/box_norm[1]",
+      "type": "list[float]",
+      "value": [
+        0.48749998844031134,
+        0.4449999982660467,
+        0.05199998797792377,
+        0.054999958385120735
+      ],
+      "source_box_xyxy_px": [
+        731.0159912109375,
+        1175.6800537109375,
+        813.3839721679688,
+        1330.5599365234375
+      ]
+    },
+    {
+      "name": "sam3/mask_head/state[1]_after_prompt",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out",
+        "geometric_prompt",
+        "masks_logits",
+        "masks",
+        "boxes",
+        "scores"
+      ]
+    },
+    {
+      "name": "sam3/mask_head/masks_logits[1]",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        1,
+        2816,
+        1584
+      ],
+      "dtype": "bool",
+      "device": "cuda:0"
+    },
+    {
+      "name": "sam3/mask_head/scores[1]",
+      "type": "torch.Tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.9399238228797913,
+        "max": 0.9399238228797913,
+        "mean": 0.9399238228797913,
+        "std": NaN
+      },
+      "sample": [
+        0.9399238228797913
+      ]
+    },
+    {
+      "name": "sam3/processor/box_norm[2]",
+      "type": "list[float]",
+      "value": [
+        0.4995000073968461,
+        0.6894999850880016,
+        0.9980000147991108,
+        0.617999943819913
+      ],
+      "source_box_xyxy_px": [
+        0.7919999957084656,
+        1071.488037109375,
+        1581.6240234375,
+        2811.77587890625
+      ]
+    },
+    {
+      "name": "sam3/mask_head/state[2]_after_prompt",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out",
+        "geometric_prompt",
+        "masks_logits",
+        "masks",
+        "boxes",
+        "scores"
+      ]
+    },
+    {
+      "name": "sam3/mask_head/masks_logits[2]",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        1,
+        2816,
+        1584
+      ],
+      "dtype": "bool",
+      "device": "cuda:0"
+    },
+    {
+      "name": "sam3/mask_head/scores[2]",
+      "type": "torch.Tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.9908755421638489,
+        "max": 0.9908755421638489,
+        "mean": 0.9908755421638489,
+        "std": NaN
+      },
+      "sample": [
+        0.9908755421638489
+      ]
+    },
+    {
+      "name": "sam3/processor/box_norm[3]",
+      "type": "list[float]",
+      "value": [
+        0.12900000153993718,
+        0.2474999934096228,
+        0.25700000308529297,
+        0.49399998682466423
+      ],
+      "source_box_xyxy_px": [
+        0.7919999957084656,
+        1.4079999923706055,
+        407.8800048828125,
+        1392.511962890625
+      ]
+    },
+    {
+      "name": "sam3/mask_head/state[3]_after_prompt",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out",
+        "geometric_prompt",
+        "masks_logits",
+        "masks",
+        "boxes",
+        "scores"
+      ]
+    },
+    {
+      "name": "sam3/mask_head/masks_logits[3]",
+      "type": "torch.Tensor",
+      "shape": [
+        2,
+        1,
+        2816,
+        1584
+      ],
+      "dtype": "bool",
+      "device": "cuda:0"
+    },
+    {
+      "name": "sam3/mask_head/scores[3]",
+      "type": "torch.Tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.31969353556632996,
+        "max": 0.9662654995918274,
+        "mean": 0.6429795026779175,
+        "std": 0.4571954309940338
+      },
+      "sample": [
+        0.9662654995918274,
+        0.31969353556632996
+      ]
+    },
+    {
+      "name": "sam3/processor/box_norm[4]",
+      "type": "list[float]",
+      "value": [
+        0.5775000061651673,
+        0.15350000069222666,
+        0.8420000172624684,
+        0.30600000138987193
+      ],
+      "source_box_xyxy_px": [
+        247.89599609375,
+        1.4079999923706055,
+        1581.6240234375,
+        863.10400390625
+      ]
+    },
+    {
+      "name": "sam3/mask_head/state[4]_after_prompt",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out",
+        "geometric_prompt",
+        "masks_logits",
+        "masks",
+        "boxes",
+        "scores"
+      ]
+    },
+    {
+      "name": "sam3/mask_head/masks_logits[4]",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        1,
+        2816,
+        1584
+      ],
+      "dtype": "bool",
+      "device": "cuda:0"
+    },
+    {
+      "name": "sam3/mask_head/scores[4]",
+      "type": "torch.Tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.9682546854019165,
+        "max": 0.9682546854019165,
+        "mean": 0.9682546854019165,
+        "std": NaN
+      },
+      "sample": [
+        0.9682546854019165
+      ]
+    },
+    {
+      "name": "sam3/processor/box_norm[5]",
+      "type": "list[float]",
+      "value": [
+        0.5780000060495704,
+        0.10449999757111073,
+        0.8410000174936622,
+        0.20799999514764006
+      ],
+      "source_box_xyxy_px": [
+        249.47999572753906,
+        1.4079999923706055,
+        1581.6240234375,
+        587.135986328125
+      ]
+    },
+    {
+      "name": "sam3/mask_head/state[5]_after_prompt",
+      "type": "dict",
+      "keys": [
+        "original_height",
+        "original_width",
+        "backbone_out",
+        "geometric_prompt",
+        "masks_logits",
+        "masks",
+        "boxes",
+        "scores"
+      ]
+    },
+    {
+      "name": "sam3/mask_head/masks_logits[5]",
+      "type": "torch.Tensor",
+      "shape": [
+        1,
+        1,
+        2816,
+        1584
+      ],
+      "dtype": "bool",
+      "device": "cuda:0"
+    },
+    {
+      "name": "sam3/mask_head/scores[5]",
+      "type": "torch.Tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "device": "cuda:0",
+      "stats": {
+        "min": 0.9463026523590088,
+        "max": 0.9463026523590088,
+        "mean": 0.9463026523590088,
+        "std": NaN
+      },
+      "sample": [
+        0.9463026523590088
+      ]
+    },
+    {
+      "name": "sam3/output/result (summary)",
+      "type": "dict",
+      "keys": [
+        "masks",
+        "image_size"
+      ]
+    }
+  ]
+}

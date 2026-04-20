@@ -8,10 +8,11 @@ Any coding agent should treat this file as a trigger to the shared repository gu
 
 Before major work, read these in order:
 
-1. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
-2. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-3. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-4. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+1. [docs/progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — single time-ordered feed of development, research and decisions. Start here for current context.
+2. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
+3. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+4. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+5. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
 
 ## Active Product Boundary
 
@@ -48,4 +49,16 @@ Before UI work, read:
 
 - [docs/standards/ui-change-gate.md](/home/coffin/dev/AgenticLabeling/docs/standards/ui-change-gate.md)
 - [docs/plans/2026-04-20-ui-reference-mapping.md](/home/coffin/dev/AgenticLabeling/docs/plans/2026-04-20-ui-reference-mapping.md)
+
+## Research / Model Observation Trigger
+
+This project originated from a research paper. Observing model architectures and data flow (Florence-2, SAM3, etc.) is a first-class activity, not debugging.
+
+Before any model architecture / data flow observation work, read:
+
+- [docs/standards/research-observation-protocol.md](/home/coffin/dev/AgenticLabeling/docs/standards/research-observation-protocol.md)
+- [docs/standards/model-inspection-conventions.md](/home/coffin/dev/AgenticLabeling/docs/standards/model-inspection-conventions.md)
+- [research/README.md](/home/coffin/dev/AgenticLabeling/research/README.md)
+
+Observation work lives in `research/` and `scripts/inspect_*.py`, not in `mvp_app/`.
 

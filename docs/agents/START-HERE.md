@@ -17,9 +17,10 @@ Those files should both point here so the repository has one shared bootstrap pa
 
 ### Always read first
 
-1. [../navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-2. [../standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-3. [../standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+1. [../progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — most recent development, research and decision context (newest first)
+2. [../navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+3. [../standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+4. [../standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
 
 ### Read by task type
 
@@ -32,6 +33,10 @@ If the task is:
 - architecture/runtime work:
   - [../tech-specs/architecture-spec.md](/home/coffin/dev/AgenticLabeling/docs/tech-specs/architecture-spec.md)
   - [../plans/2026-04-20-mvp-refactor-plan.md](/home/coffin/dev/AgenticLabeling/docs/plans/2026-04-20-mvp-refactor-plan.md)
+- model architecture / data flow observation work (research):
+  - [../standards/research-observation-protocol.md](/home/coffin/dev/AgenticLabeling/docs/standards/research-observation-protocol.md)
+  - [../standards/model-inspection-conventions.md](/home/coffin/dev/AgenticLabeling/docs/standards/model-inspection-conventions.md)
+  - [../../research/README.md](/home/coffin/dev/AgenticLabeling/research/README.md)
 - historical or recurring issue analysis:
   - [../navigability/failure-memory-index.md](/home/coffin/dev/AgenticLabeling/docs/navigability/failure-memory-index.md)
   - [../../project_memory/README.md](/home/coffin/dev/AgenticLabeling/project_memory/README.md)

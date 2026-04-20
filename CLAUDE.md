@@ -9,10 +9,11 @@ Use it as an entry trigger into the shared repository guidance below.
 
 Before making broad changes, read these in order:
 
-1. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
-2. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-3. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-4. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+1. [docs/progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — 가장 최근 개발·실험·결정 맥락 (최신순)
+2. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
+3. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+4. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+5. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
 
 ## Current Product Boundary
 
@@ -55,4 +56,16 @@ Before UI work, read:
 - [docs/plans/2026-04-20-ui-reference-mapping.md](/home/coffin/dev/AgenticLabeling/docs/plans/2026-04-20-ui-reference-mapping.md)
 
 UI work should follow the workstation direction, not a generic dashboard direction.
+
+## Research / Model Observation
+
+AgenticLabeling originated from a research paper. Observing model architectures and data flow through Florence-2 / SAM3 is a first-class project activity.
+
+Before any model architecture / data flow observation work, read:
+
+- [docs/standards/research-observation-protocol.md](/home/coffin/dev/AgenticLabeling/docs/standards/research-observation-protocol.md)
+- [docs/standards/model-inspection-conventions.md](/home/coffin/dev/AgenticLabeling/docs/standards/model-inspection-conventions.md)
+- [research/README.md](/home/coffin/dev/AgenticLabeling/research/README.md)
+
+Observation code lives in `research/` and `scripts/inspect_*.py`. Production code under `mvp_app/` must not be polluted with observation-only logging, hooks, or prints — use PyTorch's external hook APIs from scripts instead.
 
