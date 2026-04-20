@@ -2,18 +2,56 @@
 
 const ImageViewer = ({ source, objects, selectedId, onSelect, show }) => {
   const [imgOk, setImgOk] = React.useState(true);
+  // rect is the img's actual rendered rectangle inside .viewer-canvas,
+  // computed after the img loads / on resize. Overlays are placed on a
+  // layer matching this rect so percentage positions map onto the visible
+  // image content rather than the canvas letter-box.
+  const [rect, setRect] = React.useState(null);
+  const imgRef = React.useRef(null);
+
+  const measure = React.useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const parent = img.parentElement;
+    if (!parent) return;
+    const imgR = img.getBoundingClientRect();
+    const parentR = parent.getBoundingClientRect();
+    // getBoundingClientRect on an object-fit:contain img returns the img
+    // element's box (which equals parent), not the rendered image area.
+    // Compute the actual rendered rect from naturalWidth/Height + parent.
+    const nat = { w: img.naturalWidth || source.width, h: img.naturalHeight || source.height };
+    if (!nat.w || !nat.h) return;
+    const boxW = imgR.width, boxH = imgR.height;
+    const scale = Math.min(boxW / nat.w, boxH / nat.h);
+    const renderedW = nat.w * scale;
+    const renderedH = nat.h * scale;
+    const left = (imgR.left - parentR.left) + (boxW - renderedW) / 2;
+    const top = (imgR.top - parentR.top) + (boxH - renderedH) / 2;
+    setRect({ left, top, width: renderedW, height: renderedH });
+  }, [source.width, source.height]);
+
+  React.useEffect(() => {
+    measure();
+    const onResize = () => measure();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [measure, source.url]);
+
+  // Re-measure when image load state flips or objects layout changes.
+  React.useEffect(() => { measure(); }, [measure, imgOk]);
 
   return (
     <div className="viewer">
-      <div
-        className="viewer-canvas"
-        style={{ aspectRatio: `${source.width} / ${source.height}` }}
-      >
+      <div className="viewer-canvas">
         {imgOk ? (
           <img
+            ref={imgRef}
             src={source.url}
+            width={source.width}
+            height={source.height}
             alt={source.file_name}
             className="viewer-img"
+            onLoad={measure}
             onError={() => setImgOk(false)}
             draggable={false}
           />
@@ -24,53 +62,66 @@ const ImageViewer = ({ source, objects, selectedId, onSelect, show }) => {
             <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>{source.file_name}</div>
           </div>
         )}
-        {/* Mask overlays (SVG, percentage viewBox) */}
-        <svg className="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {show.mask && objects.map(o => {
-            if (o.validated === 'deleted') return null;
-            const [x, y, w, h] = o.bbox;
-            const color = CATEGORY_COLORS[o.category] || '#64748b';
-            const sel = o.object_id === selectedId;
-            return (
-              <MaskBlob
-                key={'m_' + o.object_id}
-                x={x * 100} y={y * 100} w={w * 100} h={h * 100}
-                color={color} selected={sel} seed={o.object_id}
-              />
-            );
-          })}
-        </svg>
-        {/* Bbox overlays */}
-        {show.box && objects.map(o => {
-          if (o.validated === 'deleted') return null;
-          const [x, y, w, h] = o.bbox;
-          const color = CATEGORY_COLORS[o.category] || '#64748b';
-          const sel = o.object_id === selectedId;
-          return (
-            <div
-              key={'b_' + o.object_id}
-              className={`bbox ${sel ? 'selected' : ''} ${o.validated || ''}`}
-              style={{
-                left: `${x * 100}%`,
-                top: `${y * 100}%`,
-                width: `${w * 100}%`,
-                height: `${h * 100}%`,
-                '--bb-color': color,
-              }}
-              onClick={(e) => { e.stopPropagation(); onSelect(o.object_id); }}
+        {rect && imgOk && (
+          <div
+            className="viewer-overlay-layer"
+            style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+          >
+            {/* Mask overlays (SVG) */}
+            <svg
+              className="overlay-svg"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
             >
-              {show.label && (
-                <div className="bbox-label" style={{ background: color }}>
-                  <span className="bbox-label-text">{o.category}</span>
-                  <span className="bbox-label-conf">{Math.round(o.confidence * 100)}</span>
+              {show.mask && objects.map(o => {
+                if (o.validated === 'deleted') return null;
+                const [x, y, w, h] = o.bbox;
+                const color = CATEGORY_COLORS[o.category] || '#64748b';
+                const sel = o.object_id === selectedId;
+                return (
+                  <MaskBlob
+                    key={'m_' + o.object_id}
+                    x={x * 100} y={y * 100} w={w * 100} h={h * 100}
+                    color={color} selected={sel} seed={o.object_id}
+                  />
+                );
+              })}
+            </svg>
+            {/* Bbox overlays */}
+            {show.box && objects.map(o => {
+              if (o.validated === 'deleted') return null;
+              const [x, y, w, h] = o.bbox;
+              const color = CATEGORY_COLORS[o.category] || '#64748b';
+              const sel = o.object_id === selectedId;
+              return (
+                <div
+                  key={'b_' + o.object_id}
+                  className={`bbox ${sel ? 'selected' : ''} ${o.validated || ''}`}
+                  style={{
+                    position: 'absolute',
+                    left: `${x * 100}%`,
+                    top: `${y * 100}%`,
+                    width: `${w * 100}%`,
+                    height: `${h * 100}%`,
+                    '--bb-color': color,
+                  }}
+                  onClick={(e) => { e.stopPropagation(); onSelect(o.object_id); }}
+                >
+                  {show.label && (
+                    <div className="bbox-label" style={{ background: color }}>
+                      <span className="bbox-label-text">{o.category}</span>
+                      <span className="bbox-label-conf">{Math.round(o.confidence * 100)}</span>
+                    </div>
+                  )}
+                  {o.validated === 'approved' && (
+                    <div className="bbox-badge ok"><IconCheck size={10} stroke={3} /></div>
+                  )}
                 </div>
-              )}
-              {o.validated === 'approved' && (
-                <div className="bbox-badge ok"><IconCheck size={10} stroke={3} /></div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
       {/* Zoom / coord hud */}
       <div className="viewer-hud">

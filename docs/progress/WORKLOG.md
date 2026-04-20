@@ -39,6 +39,35 @@
 
 ## 2026-04-21
 
+### [DEV] Review 뷰어 contain-fit 수정 + JS-measured overlay layer
+
+**What**: Review 워크스페이스의 이미지 뷰어에서 이미지가 영역을 벗어나 잘리는 문제 수정. `.viewer`를 flex center로, `.viewer-canvas`는 100%×100%로 채우고 `<img>`는 `object-fit: contain`으로 letterbox fit. bbox/mask/label 오버레이는 JS로 img 렌더 rect를 측정해 별도 `.viewer-overlay-layer`에 배치, 레이어 내부에서 정규화 좌표를 % 위치로 적용. `viewer.jsx`의 `measure()` 콜백이 `onLoad` / `window resize` / source 변경 시 재실행.
+**Why**: 이전에 reference의 `aspect-ratio + max-content + max-*` 조합을 그대로 이식했으나, `<img>`에 width/height 속성이 없어 intrinsic size = 0으로 붕괴하는 경계가 있었음. 사용자가 baseline cycle에서 "이미지가 화면에 다 안들어오고 크게보여서 일부 잘리는 모습" 확인. 순수 CSS로 "contain-fit + 오버레이 정렬" 둘 다 풀리지 않아 JS 측정 패턴으로 전환.
+**Result**: 브라우저 확인으로 contain-fit 정상 동작 + bbox 이미지 위에 정확히 정렬. 창 크기 변경해도 자동 재계산. 202 tests pass(docs-only·JS 변경으로 백엔드 테스트 영향 없음).
+**Details**:
+- 변경 파일: `mvp_app/static/components/viewer.jsx`, `mvp_app/static/styles.css`
+- **Related concept**: [frontend/image-viewer-overlay-alignment](../concepts/frontend/image-viewer-overlay-alignment.md) — 기초·실패 패턴·계산 로직 상세
+- **Related LEARNING**: [contain-fit 이미지 위의 오버레이는 JS로 측정한 레이어에 배치한다](LEARNINGS.md)
+
+**Triggered by**: 2026-04-21 baseline cycle 브라우저 수동 검증 (사용자 피드백)
+**Triggers**: ResizeObserver 업그레이드(현재 window resize만 듣는 한계), 마스크 실제 PNG 합성(`/api/masks/{id}`), 줌·팬 기능 추가 시 좌표 변환 통합
+
+---
+
+### [DEV] 서버 기동 실패 수정 — CREATE INDEX를 컬럼 마이그레이션 뒤로
+
+**What**: `validation_status` 마이그레이션을 위해 `SCHEMA_SQL`에 넣었던 `CREATE INDEX IF NOT EXISTS idx_objects_validation_status ON objects(validation_status)` 문을 `init_storage()` 에서 `_ensure_column(..., "validation_status", ...)` 뒤로 이동. executescript 안에서 index 생성이 실행될 때 기존 DB는 아직 컬럼이 없어 `no such column` 에러 발생했던 것을 해소.
+**Why**: Baseline cycle 시작을 위해 서버를 기동하자 `sqlite3.OperationalError: no such column: validation_status`로 lifespan startup 실패. Wave B.2에서 덧붙인 tri-state migration 로직이 idempotent 원칙을 따랐으나, **DDL 순서 의존성**(신규 컬럼을 참조하는 index)까지는 처리하지 못했었다.
+**Result**: 서버 기동 성공. 기존 DB에 `validation_status` 컬럼이 추가되고 index가 뒤이어 생성됨. 테스트 2건(mvp_app, mvp_e2e) 통과 확인 후 브라우저 테스트 진행.
+**Details**:
+- 변경 파일: `mvp_app/storage.py` (`SCHEMA_SQL`에서 해당 CREATE INDEX 제거 + `init_storage`의 `_ensure_column` 바로 뒤에 별도 실행)
+- **Related LEARNING**: [SQLite 마이그레이션에서 DDL 의존성은 컬럼 ALTER 뒤로 미룬다](LEARNINGS.md)
+
+**Triggered by**: Wave B.2 validation_status tri-state 마이그레이션의 DDL 순서 허점
+**Triggers**: 향후 다른 additive migration 시 동일 pattern 확인 (LEARNING 검증 기회 — 재발생 시 validated → promoted 검토)
+
+---
+
 ### [DEV] Learn-from-Friction 표준 + LEARNINGS 버퍼 도입
 
 **What**: `docs/standards/learn-from-friction.md` 신설 — 마찰 이벤트(실패·설계·반복·관찰)를 draft → validated → promoted 생애주기로 누적해 일반 원칙으로 승격하는 메타 루프를 표준화. 자동 hook은 **쓰지 않는다**(signal↔noise 비율이 나쁘고 역량 증명용 log가 못 됨). 대신 세 분기점에서만 기록: (1) WORKLOG entry 작성 시점, (2) 디버깅 직후, (3) 사용자 명시 지시. 품질 게이트 4문항(일반화 가능 / 비자명 / 해결 사고 필요 / 명령형 진술 가능) 중 2개 이상 YES라야 기록. `docs/progress/LEARNINGS.md` 신설, 오늘 게이트 통과한 6개 원칙을 seed로 등록: library version upper-bound, test at API contract layer, fail-fast type/shape cast, bit-exact raw comparison, external instrumentation hooks, idempotent additive schema evolution. CLAUDE.md / AGENTS.md / docs/agents/START-HERE.md 읽기 순서·의무 조항 업데이트. WORKLOG preamble에 "LEARNING 후보 자기 점검 (의무)" 추가. research-observation-protocol.md Rule 8에 observation을 LEARNING 발견 분기점으로 연결.

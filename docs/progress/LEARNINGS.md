@@ -26,6 +26,26 @@
 
 ## Entries
 
+### 2026-04-21 contain-fit 이미지 위의 오버레이는 JS로 측정한 레이어에 배치한다
+- **Trigger type**: design + repetition
+- **Triggered by**: Review 뷰어에서 사용자가 "이미지가 화면에 다 안들어오고 크게보여서 일부 잘리는 모습" 보고. 순수 CSS(`aspect-ratio + max-content`, `width:100% + object-fit: contain` 등)로 contain-fit + 오버레이 정렬을 모두 만족시키려 시도했으나 각각 다른 방식으로 실패.
+- **Evidence**: `mvp_app/static/components/viewer.jsx` `measure()` 로직, `mvp_app/static/styles.css` `.viewer-canvas` / `.viewer-overlay-layer`. 상세한 기초·심화 배경은 [concepts/frontend/image-viewer-overlay-alignment.md](../concepts/frontend/image-viewer-overlay-alignment.md).
+- **Rule (draft)**: 이미지에 `object-fit: contain`으로 letterbox fit을 적용하고 그 위에 `position:absolute` 오버레이(bbox, mask 등)를 **% 좌표**로 얹어야 할 때, CSS만으로 오버레이를 렌더 영역(letterbox 제외)에 정렬하는 것은 해법이 빈약하다. 대신 JS로 `img.naturalWidth/Height` + `img.getBoundingClientRect()`로 **실제 렌더 rect**를 계산해 **별도 overlay layer** 엘리먼트의 `left/top/width/height`에 설정하고 오버레이는 그 레이어 내부 %로 배치한다. 재계산 트리거는 최소 `onLoad`, `window resize`, `source 변경` 세 가지.
+- **Generality**: 이미지 리뷰·어노테이션 도구(Roboflow, LabelStudio, CVAT 계열), PDF·미디어 viewer, 지도 오버레이 등 "fit된 컨텐츠 + 좌표계 보존 오버레이"가 필요한 모든 웹 UI에 동일 원칙.
+- **Recurrence**: 1
+- **Status**: draft
+- **Related**: [concept: image-viewer-overlay-alignment](../concepts/frontend/image-viewer-overlay-alignment.md), [WORKLOG 2026-04-21 viewer 정렬 수정](WORKLOG.md)
+
+### 2026-04-21 SQLite 마이그레이션에서 DDL 의존성(CREATE INDEX 등)은 컬럼 ALTER 뒤로 미룬다
+- **Trigger type**: error
+- **Triggered by**: 서버 기동 시 `sqlite3.OperationalError: no such column: validation_status` 에러. 원인: `SCHEMA_SQL` 블록에 `CREATE INDEX IF NOT EXISTS idx_objects_validation_status ON objects(validation_status)` 를 넣었는데, 기존 DB의 `objects` 테이블에는 아직 해당 컬럼이 없었다. `CREATE TABLE IF NOT EXISTS`는 기존 테이블을 수정하지 않으므로, 같은 executescript 안에서 `CREATE INDEX`가 실패.
+- **Evidence**: `mvp_app/storage.py` `SCHEMA_SQL` 주석 + `init_storage` 에서 `_ensure_column` 호출 뒤 별도 `CREATE INDEX IF NOT EXISTS ... ON objects(validation_status)` 실행. 수정 commit: TBD.
+- **Rule (draft)**: SQLite처럼 "ALTER TABLE ADD COLUMN IF NOT EXISTS"가 없는 엔진에서 기존 테이블에 신규 컬럼을 도입할 때, **컬럼을 참조하는 다른 DDL**(index, trigger, view, check constraint, FK)은 **컬럼 존재 보장 후에 실행**해야 한다. 초기 스키마 블록(`CREATE TABLE IF NOT EXISTS`)과 마이그레이션 블록(`ALTER TABLE ADD COLUMN` via PRAGMA 체크)을 분리하고, 신규 컬럼을 참조하는 DDL은 마이그레이션 블록의 **뒤에** 둔다.
+- **Generality**: SQLite·MySQL 구버전·PostgreSQL 9.x 등 `ADD COLUMN IF NOT EXISTS` 지원이 제한되거나 index-on-new-column 의존성이 있는 모든 SQL 엔진에 동일. 단, Postgres ≥ 9.6은 `ADD COLUMN IF NOT EXISTS`를 지원하니 그 경우 덜 중요.
+- **Recurrence**: 1
+- **Status**: draft
+- **Related**: [LEARNING: 스키마 변경은 idempotent + 덧붙임(additive)만으로 한다](LEARNINGS.md) — 이 LEARNING의 구체적 구현 주의사항. [WORKLOG 2026-04-21 baseline cycle 시작 서버 기동 실패 수정](WORKLOG.md)
+
 ### 2026-04-21 외부 라이브러리가 구버전 API를 사용하면 상한을 명시적으로 pin한다
 - **Trigger type**: error
 - **Triggered by**: `transformers==5.5.4` 자동 해석 후 Florence-2 custom code 로드 시 `AttributeError: 'Florence2LanguageConfig' object has no attribute 'forced_bos_token_id'`

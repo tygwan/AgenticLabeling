@@ -57,7 +57,8 @@ CREATE TABLE IF NOT EXISTS objects (
 CREATE INDEX IF NOT EXISTS idx_objects_source_id ON objects(source_id);
 CREATE INDEX IF NOT EXISTS idx_objects_category_id ON objects(category_id);
 CREATE INDEX IF NOT EXISTS idx_objects_is_validated ON objects(is_validated);
-CREATE INDEX IF NOT EXISTS idx_objects_validation_status ON objects(validation_status);
+-- idx_objects_validation_status is created in init_storage() *after*
+-- _ensure_column adds the column on pre-existing DBs.
 
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
@@ -97,6 +98,13 @@ def init_storage() -> None:
     _ensure_column(conn, "sources", "error", "TEXT")
     _ensure_column(conn, "sources", "status", "TEXT DEFAULT 'pending'")
     _ensure_column(conn, "objects", "validation_status", "TEXT")
+    # Create the validation_status index *after* the column is guaranteed to
+    # exist (both on fresh schemas and on legacy DBs migrated via
+    # _ensure_column).
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_objects_validation_status "
+        "ON objects(validation_status)"
+    )
     # Backfill validation_status from legacy is_validated boolean so existing
     # rows immediately participate in the tri-state contract. Only touches
     # rows that haven't been migrated yet (NULL validation_status).

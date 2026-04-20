@@ -290,8 +290,9 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 /* Viewer */
 .viewer {
   flex: 1; position: relative;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 12px;
   background:
     linear-gradient(45deg, var(--c-surface-2) 25%, transparent 25%),
@@ -306,16 +307,33 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 .viewer-canvas {
   position: relative;
   background: #000;
-  /* CSS-only contain-fit: take the smaller of available width / height, preserve aspect. */
+  /* Fill available viewer area. The img below uses object-fit: contain so it
+     letter-boxes inside this canvas. A JS-measured overlay layer is placed
+     on top of the img's actual rendered rect so bbox percentages align with
+     the visible image content, not the canvas letter-box. */
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
-  width: max-content;
-  height: max-content;
-  /* Set via inline style: aspect-ratio */
-  container-type: inline-size;
+  display: block;
 }
 .viewer-canvas > * { min-width: 0; min-height: 0; }
-.viewer-img { width: 100%; height: 100%; object-fit: fill; display: block; user-select: none; }
+.viewer-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+}
+/* Layer sized to match the img's rendered rect (set via JS). Holds bbox
+   divs and the mask SVG so their percentage positions map onto the visible
+   image, not onto the letter-box. */
+.viewer-overlay-layer {
+  position: absolute;
+  pointer-events: none;
+}
+.viewer-overlay-layer > .bbox { pointer-events: auto; }
 .viewer-placeholder {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center; flex-direction: column;
