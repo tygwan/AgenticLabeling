@@ -28,6 +28,19 @@ Rules of use:
 
 ## Entries
 
+### 2026-04-21 이중 image encoding — Florence-2와 SAM3가 같은 이미지를 각자 별도로 인코딩
+- **Location**: `mvp_app/detector.py` `_ensure_loaded` + `detect()` (Florence-2 vision tower), `mvp_app/segmenter.py` `segment()` `set_image()` (SAM3 image encoder)
+- **Observation**: pipeline concept 작성 중 명시화됨. Florence-2는 `pixel_values [1,3,768,768]` 로 vision tower 통과, SAM3는 `set_image(PIL.Image)` 가 내부 image encoder(1024×1024 급)를 별도 통과. 두 feature space는 아키텍처·pretraining 다르므로 **공유 불가**. 큰 이미지(2816×1584 같은)에서는 downsample + normalize + encoder forward 비용 양쪽에서 반복.
+- **Evidence / hypothesis**: 이 중복 자체는 제거 불가(모델 독립성 보장). 그러나 **단계별 완화책**:
+  1. 이미지 decode(`Image.open`)는 한 번만 하고 PIL 인스턴스 공유 (현재도 그렇게 함 — OK)
+  2. 공통 thumbnail을 두 모델 모두 수용 가능한 해상도로 정해 decode·normalize 중복 줄이기
+  3. SAM3 image embedding을 object 수와 무관하게 한 번만 재사용(현재 `set_image` 호출 한 번, 이후 `add_geometric_prompt` 반복 — 이미 OK)
+  4. Florence-2 출력 bbox가 여러 개일 때 SAM3 호출을 N회 하지 않고 batched prompt 가능성 확인
+- **Priority (tentative)**: low — latency 최적화 대상이지만 "한 번 더 encode" 수준. VRAM은 영향 크지 않음.
+- **Blocked until**: 실 사용자 latency 프로파일 후 bottleneck 분포 확인. 현재 warm 791 ms 중 어느 단계가 얼마 차지하는지 per-stage 측정 먼저.
+- **Status**: noted
+- **Related concept**: [ml/florence-sam-pipeline](../concepts/ml/florence-sam-pipeline.md) §Pipeline composition의 trade-offs
+
 ### 2026-04-21 SAM3 cold start 32s → warm 0.8s: 서버 기동 시 eager preload 검토
 - **Location**: `mvp_app/segmenter.py` `SegmentationService._ensure_loaded`, `mvp_app/main.py` lifespan
 - **Observation**: baseline cycle 측정. 첫 업로드 (SAM3 `uninitialized` 상태): `run_15fa2e393001` **32,658 ms** (~32s). 두 번째 업로드 (이미 warm): `run_6e849d12c6ba` **791 ms**. 즉 SAM3 cold load가 약 31.9s를 차지. Florence-2 cold load는 이미 첫 observation들에서 별도로 관측됨.

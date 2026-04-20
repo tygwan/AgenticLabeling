@@ -39,6 +39,25 @@
 
 ## 2026-04-21
 
+### [DEV] Florence-SAM pipeline concept 작성 — 용어·구조 정리
+
+**What**: 사용자 질문 "Florence-2 / SAM3가 각각 이미지 처리하나 / caption vs class word / SAM3에 class 전달되나"에 대한 답변을 정식 concept 파일로 저장. `docs/concepts/ml/florence-sam-pipeline.md` 신설 — grounded detection (phrase grounding) vs closed-set, Florence-2 task prompts 종류, SAM family promptable segmentation (class-agnostic, prompt type 4종, multi-mask), 파이프라인 조합(Grounded SAM 패턴, 이중 image encoding trade-off), 그리고 "class name이 segmenter에 흘러가지 않는" 구조 설명 + 코드 증거. OPTIMIZATION-NOTES에 "이중 image encoding" 항목 등록. concepts README 인덱스·links 업데이트.
+**Why**: 사용자가 **용어를 정확히 사용해 소통**하고 싶어함("너와 소통하기 위해 나도 용어를 사용해서 대화하는 법을 배워야 공부가 될 것 같거든"). 이런 성격의 기술 지식은 WORKLOG entry나 observation에 파편처럼 두면 검색·누적이 불가능해 concept 파일이 적합. 또한 향후 Wave C, observation, LEARNING이 이 concept의 Evidence 섹션에 자연스럽게 기여할 수 있게 hub를 마련.
+**Result**: 
+- concept 파일 생성, 4 section(grounded detection / SAM promptable / pipeline composition / 클래스 흐름) + Evidence 5건 + Open follow-ups 5건
+- concepts README 인덱스 상단에 추가
+- OPTIMIZATION-NOTES에 이중 image encoding 항목 추가
+
+**Details**: 신규 `docs/concepts/ml/florence-sam-pipeline.md`, 업데이트 `docs/concepts/README.md`, `docs/progress/OPTIMIZATION-NOTES.md`.
+
+**Related concept**: [ml/florence-sam-pipeline](../concepts/ml/florence-sam-pipeline.md) 본 concept 자체
+**Related LEARNING**: 없음 (순수 개념 정리. LEARNING 후보는 concept의 open follow-ups에서 실험 시점에 떠오를 가능성 있음)
+
+**Triggered by**: 사용자의 용어 학습 목적 질문 3건 (grounded detection / Florence-2 caption 형태 / SAM3 class name 미수신)
+**Triggers**: prompt template 비교 실험(open follow-up 1), SAM3 text prompt 활용 실험(open follow-up 4), 이중 image encoding 최적화(open follow-up 3), OPTIMIZATION-NOTES 항목
+
+---
+
 ### [DEV] Baseline cycle 첫 실사용 — 두 가지 발견 기록
 
 **What**: 서버 GPU + BF16 기동 후 브라우저에서 실제 이미지 드래그 업로드 → Review → 오버레이 확인까지 한 사이클 수행. 작동 확인 외에도 두 건의 관측 사항을 기록 대상으로 식별.

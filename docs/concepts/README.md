@@ -85,6 +85,7 @@ Concept 파일은 LEARNING의 배경·메커니즘을 설명하고, LEARNING은 
 
 현재 등록된 concept (최신순):
 
+- [ml/florence-sam-pipeline.md](ml/florence-sam-pipeline.md) — Grounded detection(phrase grounding) + promptable segmentation 의 조합, Florence-2 task prompts, SAM family class-agnostic 원칙, class name이 segmenter로 흘러가지 않는 구조, 이중 image encoding. `type: hybrid`.
 - [frontend/image-viewer-overlay-alignment.md](frontend/image-viewer-overlay-alignment.md) — contain-fit 이미지 + bbox/mask/label 오버레이 픽셀 정렬. CSS만으로 해결 불가한 이유, JS-measured overlay layer 패턴, 좌표 공간 3종(원본 px / 정규화 / 렌더 px). `type: engineering`.
 - [backend/async-servers.md](backend/async-servers.md) — ASGI vs WSGI, uvicorn 내부, FastAPI sync/async 처리, compute-bound 시 async 한계, GPU 싱글턴과 다중 워커 충돌. `type: engineering`.
 - [ml/bf16-precision.md](ml/bf16-precision.md) — BF16 vs FP32 비트 배치·Tensor Core 경로·decode argmax drift. `type: research-derived`, 근거: FP32/BF16 observation.
