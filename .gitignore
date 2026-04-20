@@ -22,6 +22,7 @@ wheels/
 
 # Virtual environments
 .venv/
+.venv312/
 venv/
 ENV/
 env/
@@ -97,3 +98,16 @@ Thumbs.db
 *.tmp
 *.temp
 *.bak
+
+# Research observation artifacts
+# See docs/standards/research-observation-protocol.md Rule 5
+# Keep: report.md, analysis.ipynb (outputs included), summary.json, plan.md, assets/*.{png,svg}
+# Ignore: raw tensor dumps (reproducible via scripts)
+research/observations/**/*.npz
+research/observations/**/*.pt
+research/observations/**/*.safetensors
+research/observations/**/outputs/raw/
+research/experiments/**/*.npz
+research/experiments/**/*.pt
+research/experiments/**/*.safetensors
+research/experiments/**/outputs/raw/

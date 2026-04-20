@@ -64,6 +64,26 @@ class DetectionService:
 
         return None
 
+    _DTYPE_MAP = {
+        "float32": torch.float32,
+        "fp32": torch.float32,
+        "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
+        "float16": torch.float16,
+        "fp16": torch.float16,
+        "half": torch.float16,
+    }
+
+    @classmethod
+    def _resolve_dtype(cls, name: str) -> torch.dtype:
+        key = name.lower()
+        if key not in cls._DTYPE_MAP:
+            raise ValueError(
+                f"FLORENCE_DTYPE='{name}' not recognized. "
+                f"Expected one of: {sorted(set(cls._DTYPE_MAP))}"
+            )
+        return cls._DTYPE_MAP[key]
+
     def _ensure_loaded(self) -> None:
         settings = get_settings()
         if settings.fake_models or self._model is not None:
@@ -73,7 +93,7 @@ class DetectionService:
         self._model = AutoModelForCausalLM.from_pretrained(
             settings.florence_model_id,
             trust_remote_code=True,
-            dtype=torch.float32,
+            dtype=self._resolve_dtype(settings.florence_dtype),
             attn_implementation="eager",
         ).to(self.device).eval()
         self._processor = AutoProcessor.from_pretrained(
@@ -111,7 +131,20 @@ class DetectionService:
             images=image,
             return_tensors="pt",
         )
-        inputs = {k: v.to(self.device) if hasattr(v, "to") else v for k, v in inputs.items()}
+        try:
+            model_dtype = next(self._model.parameters()).dtype
+        except (StopIteration, AttributeError):
+            model_dtype = None
+        moved = {}
+        for k, v in inputs.items():
+            if hasattr(v, "to"):
+                if model_dtype is not None and isinstance(v, torch.Tensor) and v.is_floating_point():
+                    moved[k] = v.to(device=self.device, dtype=model_dtype)
+                else:
+                    moved[k] = v.to(self.device)
+            else:
+                moved[k] = v
+        inputs = moved
 
         with torch.inference_mode():
             generated_ids = self._generate_grounding(inputs)

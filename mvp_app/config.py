@@ -19,6 +19,10 @@ class Settings:
     exports_dir: Path = Path(os.getenv("EXPORTS_DIR", "data/mvp/exports"))
     fake_models: bool = os.getenv("FAKE_MODELS", "0") == "1"
     florence_model_id: str = os.getenv("FLORENCE_MODEL_ID", "microsoft/Florence-2-large")
+    # Florence-2 compute dtype. Defaults to float32 for maximum compatibility.
+    # Set to bfloat16 on Ampere/Ada (RTX 30/40, A100, H100) for ~2x speed and
+    # half the VRAM without the overflow risk of float16. Valid: float32, bfloat16, float16.
+    florence_dtype: str = os.getenv("FLORENCE_DTYPE", "float32")
     sam3_checkpoint: str = os.getenv("SAM3_CHECKPOINT", "")
     sam3_version: str = os.getenv("SAM3_VERSION", "sam3")
 

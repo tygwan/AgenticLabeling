@@ -9,8 +9,24 @@ python-multipart>=0.0.6
 chromadb>=0.4.22
 
 # ML/AI
+# torch: install a CUDA build matching your GPU/driver (see docs/setup/gpu-setup.md).
+# The CPU wheel is fine for fake-models tests but SAM3/Florence-2 real inference wants GPU.
 torch>=2.1.0
-transformers>=4.36.0
+# transformers: Florence-2 custom code is written against the 4.x API.
+# Upper-bounding until Florence-2 upstream supports 5.x.
+transformers>=4.36.0,<5.0
+# Florence-2 trust_remote_code loader depends on these at import time
+einops>=0.8.0
+timm>=1.0.0
+# SAM3 (vendor/sam3) depends on these
+iopath>=0.1.10
+ftfy>=6.1.1
+pycocotools>=2.0.7
+# Note: SAM3 perflib also imports `triton`. triton is platform-dependent:
+#   Linux + CUDA:   pip install triton
+#   Windows + CUDA: pip install triton-windows
+# Not listed here so the same file works on CPU-only CI.
+# See docs/setup/gpu-setup.md for details.
 ultralytics>=8.1.0
 opencv-python-headless>=4.9.0
 pillow>=10.2.0
