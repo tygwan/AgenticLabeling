@@ -71,6 +71,40 @@
 
 ---
 
+### [DEV] Wave B.2 — validation_status tri-state 마이그레이션 + soft-delete
+
+**What**: `objects` 테이블에 `validation_status TEXT` 컬럼을 idempotent `_ensure_column`으로 추가하고 기존 `is_validated=1` 행을 `'approved'`로 백필. `registry.validate_object`는 `is_validated=1 + validation_status='approved'` 양쪽을 원자적으로 설정, `delete_object`는 이제 **soft-delete**(`validation_status='deleted'`, row 유지), 신규 `restore_object`가 soft-delete 해제, `purge_object`가 명시적 hard-delete 경로. `list_objects`에 `include_deleted=False` 파라미터를 default로 soft-delete row 숨김. `get_stats`에 `deleted_objects` 카운트 추가. `DELETE /api/review/objects/{id}` 의미를 soft로 바꾸고 `POST /api/review/objects/{id}/restore` 엔드포인트 신설. workspace endpoint의 `validated` 필드가 tri-state(`null`|`approved`|`deleted`)를 그대로 노출. `api.jsx` `restoreObject` 추가, `App.handleUpdateObject`가 `null` 전이 시 이전 상태가 `deleted`면 `/restore` 호출, 아니면 UI-only flip.
+
+**Why**: Reference UI가 tri-state를 전제로 설계되어 있음. hard-delete는 실수 복구가 불가능하고, dataset curation 경험상 "오류로 지운 뒤 되돌리고 싶다"가 실제로 빈번. soft-delete는 mask 파일도 유지해 복구 가능. build-first 원칙 하에서 지금 schema 덧붙임으로 넣어두면 나중에 승인 흐름·audit 흐름 확장이 쉬워짐.
+
+**Result**: 202 tests pass. 수동 lifecycle smoke test 통과 — pending → deleted(hidden) → restored(pending) → approved 전이 확인. stats에 `deleted_objects`까지 표시.
+
+**Details**: 변경 파일 `mvp_app/storage.py`, `mvp_app/registry.py`, `mvp_app/main.py`, `mvp_app/static/components/api.jsx`, `mvp_app/static/index.html`. 
+
+**Related LEARNING**: [스키마 변경은 idempotent + 덧붙임(additive)만으로 한다](LEARNINGS.md) — `ALTER TABLE ADD COLUMN` 이 SQLite에서 `IF NOT EXISTS` 미지원이라 `_ensure_column` helper로 PRAGMA 체크 후 조건부 ALTER. 이 패턴 자체가 위 LEARNING의 구체적 구현 예.
+
+**Triggered by**: Wave B.1 완료
+**Triggers**: Batch approve/restore 기능(일괄 선택 + bulk delete/restore), "휴지통" UI 스크린, audit log를 위한 validation history 저장
+
+---
+
+### [DEV] Wave B.1 — source.error 필드 + failed status + tombstone
+
+**What**: `sources` 테이블에 `error TEXT`, `status TEXT DEFAULT 'pending'` 컬럼을 `_ensure_column` helper로 idempotent 추가. `register_source`가 status/error 인자 지원, 신규 `set_source_status`. `/api/pipeline/auto-label`이 nested try 구조로 변경: 이미지 디코딩 실패 시 tombstone source(width=0, status=`failed`, 의미 있는 error) 등록 + HTTP 400. 그 외 실패는 이미 등록된 source를 `failed`로 업데이트. 외부 try/except가 HTTPException은 통과시켜 원본 error 메시지 보존. workspace endpoint의 status 계산이 persisted status(`failed`)를 derived 로직보다 우선.
+
+**Why**: 업로드 실패는 지금껏 단순 500으로 끝나고 DB에 흔적이 없었다. UI의 "failed" 필터/리스트가 의미를 가지려면 실패 자체를 DB에 기록해야 함. Frontend Requirements Response의 "Batch work list — pending / validated / failed" 요구에 직접 대응.
+
+**Result**: 202 tests pass. 가짜 이미지(`not-an-image` bytes)로 재현 smoke test: 응답은 400 + "invalid image: UnidentifiedImageError: ...", workspace에 `status=failed` + 동일 error 메시지의 source row 생김.
+
+**Details**: 변경 파일 `mvp_app/storage.py`, `mvp_app/registry.py`, `mvp_app/main.py`.
+
+**Related LEARNING**: 없음 — 이 entry 전체가 기존 "idempotent schema evolution" / "fail-fast type/shape" LEARNINGS의 적용 예.
+
+**Triggered by**: Wave A.1/A.2 완료 + Frontend Requirements Response 요구
+**Triggers**: Wave B.2 (validation_status 도 같은 idempotent schema 패턴)
+
+---
+
 ### [DEV] Wave A.2 — Export splits (API + 분할 로직)
 
 **What**: `registry.export_dataset` 가 `split_ratios={'train','val','test'}` 인자를 받고, `_split_sources`가 percent/fraction 둘 다 허용하며 정규화해 index-based split 수행. `/api/export` 가 `split_train/split_val/split_test` Form 필드 받아 전달. `mvp_app/static/components/api.jsx` `exportDataset`가 splits 전송. `ExportScreen`이 UI slider 값을 그대로 보냄.

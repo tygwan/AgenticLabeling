@@ -40,17 +40,36 @@ class Registry:
         width: int,
         height: int,
         source_type: str = "image",
+        status: str = "pending",
+        error: Optional[str] = None,
     ) -> str:
         source_id = f"src_{uuid.uuid4().hex[:12]}"
         conn = get_conn()
         conn.execute(
-            """INSERT INTO sources (source_id, project_id, source_type, file_path, file_name, width, height)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (source_id, project_id, source_type, file_path, file_name, width, height),
+            """INSERT INTO sources
+               (source_id, project_id, source_type, file_path, file_name, width, height, status, error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (source_id, project_id, source_type, file_path, file_name, width, height, status, error),
         )
         conn.commit()
         conn.close()
         return source_id
+
+    def set_source_status(
+        self,
+        source_id: str,
+        *,
+        status: str,
+        error: Optional[str] = None,
+    ) -> None:
+        """Update a source's status and optional error message."""
+        conn = get_conn()
+        conn.execute(
+            "UPDATE sources SET status = ?, error = ? WHERE source_id = ?",
+            (status, error, source_id),
+        )
+        conn.commit()
+        conn.close()
 
     def list_sources(self, limit: int = 100) -> list[dict]:
         conn = get_conn()
@@ -131,7 +150,14 @@ class Registry:
         *,
         source_id: Optional[str] = None,
         is_validated: Optional[bool] = None,
+        include_deleted: bool = False,
     ) -> list[dict]:
+        """List objects.
+
+        - `is_validated=True` narrows to `validation_status = 'approved'`.
+        - `include_deleted=False` (default) hides soft-deleted rows so callers
+          that treat objects as "live data" continue to work unchanged.
+        """
         conn = get_conn()
         query = (
             "SELECT o.*, c.name AS category_name FROM objects o "
@@ -142,9 +168,12 @@ class Registry:
         if source_id:
             conditions.append("o.source_id = ?")
             params.append(source_id)
-        if is_validated is not None:
-            conditions.append("o.is_validated = ?")
-            params.append(1 if is_validated else 0)
+        if is_validated is True:
+            conditions.append("o.validation_status = 'approved'")
+        elif is_validated is False:
+            conditions.append("(o.validation_status IS NULL OR o.validation_status = 'pending')")
+        if not include_deleted:
+            conditions.append("(o.validation_status IS NULL OR o.validation_status != 'deleted')")
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY o.created_at DESC"
@@ -166,8 +195,9 @@ class Registry:
     def validate_object(self, object_id: str, reviewer: str = "reviewer", quality_score: float = 0.9) -> bool:
         conn = get_conn()
         cursor = conn.execute(
-            "UPDATE objects SET is_validated = 1, validated_by = ?, quality_score = ?, "
-            "updated_at = CURRENT_TIMESTAMP WHERE object_id = ?",
+            "UPDATE objects SET is_validated = 1, validation_status = 'approved', "
+            "validated_by = ?, quality_score = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE object_id = ?",
             (reviewer, quality_score, object_id),
         )
         conn.commit()
@@ -175,14 +205,43 @@ class Registry:
         return cursor.rowcount > 0
 
     def delete_object(self, object_id: str) -> bool:
+        """Soft-delete: mark the row as 'deleted' but keep it (and its mask
+        on disk) so a restore is possible. Use `purge_object` for hard
+        removal."""
         current = self.get_object(object_id)
         if not current:
             return False
         conn = get_conn()
         cursor = conn.execute(
-            "DELETE FROM objects WHERE object_id = ?",
+            "UPDATE objects SET validation_status = 'deleted', is_validated = 0, "
+            "updated_at = CURRENT_TIMESTAMP WHERE object_id = ?",
             (object_id,),
         )
+        conn.commit()
+        conn.close()
+        return cursor.rowcount > 0
+
+    def restore_object(self, object_id: str) -> bool:
+        """Reverse a soft-delete. Row returns to pending (validation_status NULL)."""
+        conn = get_conn()
+        cursor = conn.execute(
+            "UPDATE objects SET validation_status = NULL, is_validated = 0, "
+            "updated_at = CURRENT_TIMESTAMP "
+            "WHERE object_id = ? AND validation_status = 'deleted'",
+            (object_id,),
+        )
+        conn.commit()
+        conn.close()
+        return cursor.rowcount > 0
+
+    def purge_object(self, object_id: str) -> bool:
+        """Hard delete: remove the row and its mask file permanently.
+        Intended for 'empty trash' workflows, not the normal delete path."""
+        current = self.get_object(object_id)
+        if not current:
+            return False
+        conn = get_conn()
+        cursor = conn.execute("DELETE FROM objects WHERE object_id = ?", (object_id,))
         conn.commit()
         conn.close()
         remove_mask_file(current.get("mask_path"))
@@ -198,9 +257,15 @@ class Registry:
         conn = get_conn()
         stats = {
             "sources": conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0],
-            "objects": conn.execute("SELECT COUNT(*) FROM objects").fetchone()[0],
+            "objects": conn.execute(
+                "SELECT COUNT(*) FROM objects "
+                "WHERE validation_status IS NULL OR validation_status != 'deleted'"
+            ).fetchone()[0],
             "validated_objects": conn.execute(
-                "SELECT COUNT(*) FROM objects WHERE is_validated = 1"
+                "SELECT COUNT(*) FROM objects WHERE validation_status = 'approved'"
+            ).fetchone()[0],
+            "deleted_objects": conn.execute(
+                "SELECT COUNT(*) FROM objects WHERE validation_status = 'deleted'"
             ).fetchone()[0],
             "categories": conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0],
             "runs": conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0],

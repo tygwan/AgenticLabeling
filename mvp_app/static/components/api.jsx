@@ -17,6 +17,11 @@ const API = {
     if (!r.ok) throw new Error(`delete failed: ${r.status}`);
     return r.json();
   },
+  async restoreObject(objectId) {
+    const r = await fetch(`/api/review/objects/${objectId}/restore`, { method: 'POST' });
+    if (!r.ok) throw new Error(`restore failed: ${r.status}`);
+    return r.json();
+  },
   async uploadImage({ file, projectId, classes }) {
     const form = new FormData();
     form.append('image', file);

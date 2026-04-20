@@ -120,14 +120,19 @@ function App() {
       try { await API.approveObject(objectId); }
       catch (e) { workspace.mutateObject(sourceId, objectId, { validated: null }); console.error(e); }
     } else if (action === 'deleted') {
+      // Soft-delete: row stays (can be restored), UI marks it as deleted.
       workspace.mutateObject(sourceId, objectId, { validated: 'deleted' });
-      try {
-        await API.deleteObject(objectId);
-        workspace.removeObject(sourceId, objectId);
-      } catch (e) { workspace.mutateObject(sourceId, objectId, { validated: null }); console.error(e); }
+      try { await API.deleteObject(objectId); }
+      catch (e) { workspace.mutateObject(sourceId, objectId, { validated: null }); console.error(e); }
     } else if (action === null || action === 'pending') {
-      // Un-validate is not a server op today (no rollback endpoint); keep UI state only.
+      // Restore / un-validate: route through /restore if the server has
+      // this row marked deleted; otherwise it's an optimistic UI flip only.
+      const prev = workspace.data?.sources?.find(s => s.id === sourceId)?.objects?.find(o => o.object_id === objectId)?.validated;
       workspace.mutateObject(sourceId, objectId, { validated: null });
+      if (prev === 'deleted') {
+        try { await API.restoreObject(objectId); }
+        catch (e) { workspace.mutateObject(sourceId, objectId, { validated: prev }); console.error(e); }
+      }
     }
   }, [workspace]);
 

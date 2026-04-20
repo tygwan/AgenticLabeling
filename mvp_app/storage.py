@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS sources (
     file_name TEXT NOT NULL,
     width INTEGER,
     height INTEGER,
+    error TEXT,
+    status TEXT DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -43,6 +45,7 @@ CREATE TABLE IF NOT EXISTS objects (
     detection_model TEXT,
     mask_path TEXT,
     is_validated INTEGER NOT NULL DEFAULT 0,
+    validation_status TEXT,
     validated_by TEXT,
     quality_score REAL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +57,7 @@ CREATE TABLE IF NOT EXISTS objects (
 CREATE INDEX IF NOT EXISTS idx_objects_source_id ON objects(source_id);
 CREATE INDEX IF NOT EXISTS idx_objects_category_id ON objects(category_id);
 CREATE INDEX IF NOT EXISTS idx_objects_is_validated ON objects(is_validated);
+CREATE INDEX IF NOT EXISTS idx_objects_validation_status ON objects(validation_status);
 
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
@@ -76,12 +80,30 @@ CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
 """
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    """Idempotently add a column to an existing table (SQLite lacks ADD COLUMN IF NOT EXISTS)."""
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_storage() -> None:
     """Initialize runtime directories and SQLite schema."""
     settings = get_settings()
     settings.ensure_dirs()
     conn = sqlite3.connect(settings.sqlite_path)
     conn.executescript(SCHEMA_SQL)
+    # Additive migrations for pre-existing databases — safe no-op when columns exist.
+    _ensure_column(conn, "sources", "error", "TEXT")
+    _ensure_column(conn, "sources", "status", "TEXT DEFAULT 'pending'")
+    _ensure_column(conn, "objects", "validation_status", "TEXT")
+    # Backfill validation_status from legacy is_validated boolean so existing
+    # rows immediately participate in the tri-state contract. Only touches
+    # rows that haven't been migrated yet (NULL validation_status).
+    conn.execute(
+        "UPDATE objects SET validation_status = 'approved' "
+        "WHERE validation_status IS NULL AND is_validated = 1"
+    )
     conn.commit()
     conn.close()
 

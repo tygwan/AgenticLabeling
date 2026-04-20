@@ -173,10 +173,36 @@ async def run_auto_label(
         segmentation_backend=segmenter.backend_name,
     )
 
+    source_id: Optional[str] = None
     try:
         stored_path = store_image_bytes(image.filename or f"{uuid4().hex}.jpg", image_bytes)
-        with Image.open(stored_path).convert("RGB") as img:
-            width, height = img.width, img.height
+        try:
+            with Image.open(stored_path).convert("RGB") as img:
+                width, height = img.width, img.height
+        except Exception as img_exc:
+            # Even if we can't decode, register a tombstone source so the UI
+            # can show the failed upload rather than dropping bytes silently.
+            err = f"invalid image: {type(img_exc).__name__}: {img_exc}"[:500]
+            source_id = registry.register_source(
+                project_id=project_id,
+                file_path=str(stored_path.resolve()),
+                file_name=stored_path.name,
+                width=0,
+                height=0,
+                status="failed",
+                error=err,
+            )
+            registry.finish_run(run_id, status="failed", source_id=source_id, error=err)
+            raise HTTPException(status_code=400, detail=err)
+
+        source_id = registry.register_source(
+            project_id=project_id,
+            file_path=str(stored_path.resolve()),
+            file_name=stored_path.name,
+            width=width,
+            height=height,
+            status="in_review",
+        )
 
         detection = detector.detect(image_bytes, class_list)
         raw_boxes = detection.get("boxes", [])
@@ -185,14 +211,6 @@ async def run_auto_label(
 
         segmentation = segmenter.segment(image_bytes, raw_boxes) if raw_boxes else {"masks": []}
         masks = segmentation.get("masks", [])
-
-        source_id = registry.register_source(
-            project_id=project_id,
-            file_path=str(stored_path.resolve()),
-            file_name=stored_path.name,
-            width=width,
-            height=height,
-        )
 
         objects_data = []
         for idx, raw_box in enumerate(raw_boxes):
@@ -219,8 +237,15 @@ async def run_auto_label(
             "file_name": stored_path.name,
             "segmentation_backend": segmenter.backend_name,
         }
+    except HTTPException:
+        # Already recorded by the inner handler; re-raise unchanged so the
+        # client sees the original status and detail.
+        raise
     except Exception as exc:
-        registry.finish_run(run_id, status="failed", error=str(exc)[:500])
+        error_msg = f"{type(exc).__name__}: {str(exc)}"[:500]
+        if source_id is not None:
+            registry.set_source_status(source_id, status="failed", error=error_msg)
+        registry.finish_run(run_id, status="failed", source_id=source_id, error=error_msg)
         raise
 
 
@@ -249,9 +274,19 @@ def api_validate_object(object_id: str) -> dict:
 
 @app.delete("/api/review/objects/{object_id}")
 def api_delete_object(object_id: str) -> dict:
+    """Soft-delete: row stays in DB with validation_status='deleted' so the
+    action is reversible via POST /api/review/objects/{id}/restore."""
     if not registry.delete_object(object_id):
         raise HTTPException(status_code=404, detail="Object not found")
-    return {"success": True, "object_id": object_id}
+    return {"success": True, "object_id": object_id, "validation_status": "deleted"}
+
+
+@app.post("/api/review/objects/{object_id}/restore")
+def api_restore_object(object_id: str) -> dict:
+    """Reverse a soft-delete; row returns to pending."""
+    if not registry.restore_object(object_id):
+        raise HTTPException(status_code=404, detail="Object not found or not deleted")
+    return {"success": True, "object_id": object_id, "validation_status": None}
 
 
 @app.post("/review/objects/{object_id}/approve")
@@ -387,20 +422,29 @@ def api_workspace() -> dict:
         approved = 0
         for obj in objects_raw:
             classes_set.add(obj.get("category_name") or "object")
-            if obj.get("is_validated"):
+            if obj.get("validation_status") == "approved":
                 approved += 1
 
-        total_objs = len(objects_raw)
-        if total_objs == 0:
-            status = "pending"
-        elif approved == total_objs:
-            status = "validated"
+        # Persisted status wins (e.g. 'failed' from a pipeline error) so the
+        # failure is never hidden by derived progress logic.
+        persisted_status = src.get("status")
+        if persisted_status == "failed":
+            status = "failed"
         else:
-            status = "in_review"
+            total_objs = len(objects_raw)
+            if total_objs == 0:
+                status = persisted_status or "pending"
+            elif approved == total_objs:
+                status = "validated"
+            else:
+                status = "in_review"
 
         objects: list[dict] = []
         for obj in objects_raw:
             category = obj.get("category_name") or "object"
+            vs = obj.get("validation_status")
+            # Tri-state mapping: 'approved' | 'deleted' | None (pending)
+            validated = vs if vs in ("approved", "deleted") else None
             objects.append(
                 {
                     "object_id": obj["object_id"],
@@ -419,7 +463,7 @@ def api_workspace() -> dict:
                         obj.get("bbox_h") or 0.0,
                     ],
                     "confidence": obj.get("confidence"),
-                    "validated": "approved" if obj.get("is_validated") else None,
+                    "validated": validated,
                     "mask_url": f"/api/masks/{obj['object_id']}" if obj.get("mask_path") else None,
                 }
             )
@@ -432,6 +476,7 @@ def api_workspace() -> dict:
                 "width": width,
                 "height": height,
                 "status": status,
+                "error": src.get("error"),
                 "project": project_id,
                 "classes": sorted(classes_set),
                 "uploaded_at": src.get("created_at"),
