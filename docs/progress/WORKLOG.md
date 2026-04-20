@@ -39,6 +39,25 @@
 
 ## 2026-04-21
 
+### [DEV] Baseline cycle 첫 실사용 — 두 가지 발견 기록
+
+**What**: 서버 GPU + BF16 기동 후 브라우저에서 실제 이미지 드래그 업로드 → Review → 오버레이 확인까지 한 사이클 수행. 작동 확인 외에도 두 건의 관측 사항을 기록 대상으로 식별.
+**Why**: build-first 원칙에 따라 Wave A·B로 기능을 다 붙인 뒤 한 사이클 돌려 실제로 어디서 문제가 드러나는지 관찰. 이 관찰이 OPTIMIZATION-NOTES·LEARNINGS의 실제 근거가 된다.
+**Found**:
+- **SAM3 cold start 32s → warm 0.8s** — 첫 업로드 (run_15fa2e393001) 32,658 ms 중 대부분이 SAM3 모델 로드. 이후 업로드(run_6e849d12c6ba) 791 ms. 40배 차이. → OPTIMIZATION-NOTES 신규 항목.
+- **DB `sources.file_path` 절대 경로 문제** — 과거 WSL 환경의 `/home/coffin/...` 경로가 Windows에서 못 열려 Review 뷰어에서 4개 source가 500. → LEARNING "절대 경로 금지" + OPTIMIZATION-NOTES migration 후보.
+- Review 워크스페이스 contain-fit·bbox 정렬은 직전 fix로 정상 동작 확인.
+**Details**:
+- **Related LEARNING**: [파일 경로는 상대 경로 또는 content-addressed 키로 저장한다](LEARNINGS.md)
+- **Related OPTIMIZATION-NOTES**: [SAM3 cold start 32s → warm 0.8s](OPTIMIZATION-NOTES.md), [sources.file_path absolute path](OPTIMIZATION-NOTES.md)
+- 서버 로그: `C:\Users\user\AppData\Local\...\bqfjorli1.output` (세션 한정)
+- runs 테이블 측정: `curl /api/runs` 결과
+
+**Triggered by**: 2026-04-21 baseline cycle 수동 실사용
+**Triggers**: Wave C 이전에 file_path migration 실행 권장, SAM3 eager preload 검토(Deployment Ops), 관련 LEARNING 재발생 모니터
+
+---
+
 ### [DEV] Review 뷰어 contain-fit 수정 + JS-measured overlay layer
 
 **What**: Review 워크스페이스의 이미지 뷰어에서 이미지가 영역을 벗어나 잘리는 문제 수정. `.viewer`를 flex center로, `.viewer-canvas`는 100%×100%로 채우고 `<img>`는 `object-fit: contain`으로 letterbox fit. bbox/mask/label 오버레이는 JS로 img 렌더 rect를 측정해 별도 `.viewer-overlay-layer`에 배치, 레이어 내부에서 정규화 좌표를 % 위치로 적용. `viewer.jsx`의 `measure()` 콜백이 `onLoad` / `window resize` / source 변경 시 재실행.

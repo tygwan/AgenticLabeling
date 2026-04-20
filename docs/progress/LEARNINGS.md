@@ -26,6 +26,16 @@
 
 ## Entries
 
+### 2026-04-21 파일 경로는 상대 경로 또는 content-addressed 키로 저장한다 (절대 경로 금지)
+- **Trigger type**: observation
+- **Triggered by**: baseline cycle 중 `GET /api/assets/src_...` 가 다수 500 에러. 로그에 `RuntimeError: File at path /home/coffin/dev/AgenticLabeling/data/mvp/assets/...jpg does not exist`. 원인: 과거 WSL/Linux 환경에서 DB에 저장된 `sources.file_path`가 현재 Windows 경로와 불일치. `sources` 테이블 7행 중 4행이 이 문제로 접근 불가.
+- **Evidence**: `mvp_app/registry.py:48` `register_source`가 `file_path=str(stored_path.resolve())` 로 **absolute path** 저장. workspace API 응답의 `url: /api/assets/{source_id}` 는 DB에 저장된 경로를 그대로 열려고 시도 → 환경 이전 시 전부 깨짐.
+- **Rule (draft)**: 파일/이미지/마스크 등 **영속 저장소**에서 경로를 기록할 때 **절대 경로는 피하고** 대신 ① 프로젝트 루트 기준 상대 경로, ② storage root 기준 상대 경로(`assets_dir` 와 조합해 resolve), ③ content-addressed 키(sha256 + shard) 중 하나를 선택한다. 이유: 절대 경로는 **환경(OS, 사용자, 컨테이너, 마운트 지점)에 묶여** 백업 복원·환경 이전·다른 사용자 재현을 못 한다. DB는 수년을 살지만 absolute path의 의미는 수 주도 안 간다.
+- **Generality**: SQL/NoSQL/파일 DB 무관, 원격 오브젝트 스토리지 키, 파일 업로드 시스템, ML 데이터셋 카탈로그 모두 적용. Linux·Windows·macOS 이식성 요건 있을 때 특히.
+- **Recurrence**: 1
+- **Status**: draft
+- **Related**: [LEARNING: 스키마 변경은 idempotent + 덧붙임(additive)만으로 한다](LEARNINGS.md) — 이 문제의 fix는 migration으로 기존 absolute를 relative로 변환할 수 있어야 한다는 점에서 연관. [OPTIMIZATION-NOTES: file_path 환경 이식성](OPTIMIZATION-NOTES.md)
+
 ### 2026-04-21 contain-fit 이미지 위의 오버레이는 JS로 측정한 레이어에 배치한다
 - **Trigger type**: design + repetition
 - **Triggered by**: Review 뷰어에서 사용자가 "이미지가 화면에 다 안들어오고 크게보여서 일부 잘리는 모습" 보고. 순수 CSS(`aspect-ratio + max-content`, `width:100% + object-fit: contain` 등)로 contain-fit + 오버레이 정렬을 모두 만족시키려 시도했으나 각각 다른 방식으로 실패.

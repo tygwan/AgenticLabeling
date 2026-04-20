@@ -28,6 +28,23 @@ Rules of use:
 
 ## Entries
 
+### 2026-04-21 SAM3 cold start 32s → warm 0.8s: 서버 기동 시 eager preload 검토
+- **Location**: `mvp_app/segmenter.py` `SegmentationService._ensure_loaded`, `mvp_app/main.py` lifespan
+- **Observation**: baseline cycle 측정. 첫 업로드 (SAM3 `uninitialized` 상태): `run_15fa2e393001` **32,658 ms** (~32s). 두 번째 업로드 (이미 warm): `run_6e849d12c6ba` **791 ms**. 즉 SAM3 cold load가 약 31.9s를 차지. Florence-2 cold load는 이미 첫 observation들에서 별도로 관측됨.
+- **Evidence / hypothesis**: 현재 서비스는 lazy load 패턴(`_ensure_loaded()` at first call)이라 **첫 사용자가 기다리는 비용이 크다**. lifespan startup에서 `detector._ensure_loaded()`, `segmenter._ensure_loaded()`를 호출해 eager preload하면 보이는 지연을 전부 서버 boot로 이동 — boot 시간은 늘지만 첫 사용자 경험은 즉각적. trade-off: 배포 orchestrator가 health probe를 너무 공격적으로 치면 ready 전에 kill 당할 수 있어 startup probe / readiness probe 분리 필요.
+- **Priority (tentative)**: medium — 프로덕션 UX에 직접 영향. 단 이 MVP는 single-tenant dev env라 현재는 체감 크지 않음. 여러 사용자 환경 되면 우선순위 상승.
+- **Blocked until**: 한 사이클 완료 후 추가 프로파일링(모델별 개별 시간, lifespan 내 병렬 preload 가능성). Wave C 또는 Deployment Ops 단계에서 같이 다룸.
+- **Status**: noted
+
+### 2026-04-21 `sources.file_path` absolute path가 DB에 고정 → 환경 이전 불가
+- **Location**: `mvp_app/registry.py:48` `register_source(... file_path=str(stored_path.resolve()))`, `mvp_app/main.py` `/api/assets/{source_id}` FileResponse
+- **Observation**: 과거 WSL `/home/coffin/...` 경로가 DB에 그대로 남아 Windows에서 4개 source가 500 에러. 사용자가 Review에서 이들 이미지를 열 수 없음.
+- **Evidence / hypothesis**: `register_source`는 absolute path를 저장하고, FileResponse는 그 경로를 그대로 open() 시도. 두 레이어 모두 경로 해석 추상화 없음. 해법: ① `file_path`를 `settings.assets_dir` 기준 상대 경로로 저장 → 열 때 `settings.assets_dir / file_path`로 resolve. ② 또는 파일명만 저장(`stored_path.name`)하고 디렉토리는 runtime settings에서 계산. 마이그레이션: 기존 absolute path 행들을 파일명만 추출해 갱신, 대응 파일이 없으면 `status='failed'`로 표시.
+- **Priority (tentative)**: high-ish — 현재 반복 재현 중이고 baseline cycle 의 UX를 해침. 단 Wave C/Deployment Ops보다는 "배경 정리" 성격.
+- **Blocked until**: migration 스크립트 작성 + 기존 broken rows 정리 정책 결정(삭제 vs failed tombstone).
+- **Status**: noted
+- **Related LEARNING**: [파일 경로는 상대 경로 또는 content-addressed 키로 저장한다](LEARNINGS.md)
+
 ### 2026-04-20 Florence-2 `_supports_sdpa` 패치로 BF16 속도 회복 시도
 - **Location**: Florence-2 HF cache custom modeling (`configuration_florence2.py`, `modeling_florence2.py`)
 - **Observation**: FP32 vs BF16 observation에서 BF16 speedup이 1.03×에 그쳤고, `attn_implementation='sdpa'` 사용은 Florence-2 custom class가 `_supports_sdpa` 속성을 선언하지 않아 transformers의 `_sdpa_can_dispatch`가 AttributeError를 던져 막힘 (2026-04-20 WORKLOG `[RESEARCH]` entry 참조).
