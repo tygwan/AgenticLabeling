@@ -18,9 +18,11 @@ Those files should both point here so the repository has one shared bootstrap pa
 ### Always read first
 
 1. [../progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — most recent development, research and decision context (newest first)
-2. [../navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-3. [../standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-4. [../standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+2. [../progress/LEARNINGS.md](/home/coffin/dev/AgenticLabeling/docs/progress/LEARNINGS.md) — curated candidate general principles
+3. [../navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+4. [../standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+5. [../standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md)
+6. [../standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
 
 ### Read by task type
 

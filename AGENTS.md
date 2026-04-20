@@ -9,10 +9,14 @@ Any coding agent should treat this file as a trigger to the shared repository gu
 Before major work, read these in order:
 
 1. [docs/progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — single time-ordered feed of development, research and decisions. Start here for current context.
-2. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
-3. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-4. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-5. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+2. [docs/progress/LEARNINGS.md](/home/coffin/dev/AgenticLabeling/docs/progress/LEARNINGS.md) — curated candidate general principles (draft/validated/promoted)
+3. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
+4. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+5. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+6. [docs/standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md) — the meta-loop that turns friction into reusable rules
+7. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+
+When writing a WORKLOG entry (any tag), apply learn-from-friction Rule 1.1: check whether the entry exposes a general, non-obvious, reusable rule. If it passes the four-question gate, append a draft to `docs/progress/LEARNINGS.md` and link it from the WORKLOG entry's Details.
 
 ## Active Product Boundary
 

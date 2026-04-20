@@ -18,4 +18,5 @@ These rules are always active and should remain valid regardless of project topi
 10. [C10-observability.md](C10-observability.md)
 11. [C11-security-and-risk.md](C11-security-and-risk.md)
 12. [C12-documentation-and-discoverability.md](C12-documentation-and-discoverability.md)
+13. [C13-learn-from-friction.md](C13-learn-from-friction.md)
 

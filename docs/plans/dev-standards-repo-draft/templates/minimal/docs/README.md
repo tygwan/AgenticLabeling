@@ -11,6 +11,7 @@ This directory contains durable project knowledge that should remain discoverabl
 - problem tracking
 - dependency inventory
 - verification notes
+- [LEARNINGS.md](LEARNINGS.md) — candidate general rules discovered from friction (C13)
 
 ## Active Standards Composition
 

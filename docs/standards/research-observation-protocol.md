@@ -149,11 +149,13 @@ observation 폴더를 완성하는 것만으로는 **왜 그 실험을 했는지
 - **What** — 한두 줄로 무엇을 관찰했는가
 - **Why** — 이 실험을 촉발한 개발·질문·선행 결정
 - **Found** — 핵심 발견 3-5 bullet
-- **Details** — `report.md` 링크
+- **Details** — `report.md` 링크 + Related LEARNING 링크 (있으면)
 - **Triggered by** — 이 실험을 유발한 선행 WORKLOG entry (DEV, RESEARCH, DECISION)
 - **Triggers** — 이 실험이 만들 후속 작업 (생기면 이 필드 갱신)
 
 이 규칙이 지켜지면 포트폴리오·회고 시 "어떤 개발 → 어떤 실험 → 어떤 결정 → 다음 개발" 흐름을 한 파일에서 읽어낼 수 있다. 실험만 따로 기록되면 자료로서 가치가 급격히 떨어진다.
+
+또한 observation 단계는 **LEARNING 후보가 발견되는 대표 분기점**이다 (특히 결과가 가설과 어긋날 때, bit-exact 비교로 divergence가 드러날 때, 새로운 제약/호환성 이슈가 발견될 때). Interpretation 섹션과 WORKLOG [RESEARCH] entry를 쓰면서 반드시 [learn-from-friction.md](learn-from-friction.md) Rule 2의 4문항 게이트로 자기 점검하고, 통과하는 항목은 [docs/progress/LEARNINGS.md](../progress/LEARNINGS.md) 에 draft로 append한다.
 
 ## 인덱싱
 

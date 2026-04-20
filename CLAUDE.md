@@ -10,10 +10,14 @@ Use it as an entry trigger into the shared repository guidance below.
 Before making broad changes, read these in order:
 
 1. [docs/progress/WORKLOG.md](/home/coffin/dev/AgenticLabeling/docs/progress/WORKLOG.md) — 가장 최근 개발·실험·결정 맥락 (최신순)
-2. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
-3. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
-4. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
-5. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+2. [docs/progress/LEARNINGS.md](/home/coffin/dev/AgenticLabeling/docs/progress/LEARNINGS.md) — curated 일반 원칙 후보집 (draft/validated/promoted)
+3. [docs/agents/START-HERE.md](/home/coffin/dev/AgenticLabeling/docs/agents/START-HERE.md)
+4. [docs/navigability/README.md](/home/coffin/dev/AgenticLabeling/docs/navigability/README.md)
+5. [docs/standards/adoption-model.md](/home/coffin/dev/AgenticLabeling/docs/standards/adoption-model.md)
+6. [docs/standards/learn-from-friction.md](/home/coffin/dev/AgenticLabeling/docs/standards/learn-from-friction.md) — 마찰 이벤트에서 일반 원칙을 뽑는 루프
+7. [docs/standards/implementation-memory-summary.md](/home/coffin/dev/AgenticLabeling/docs/standards/implementation-memory-summary.md)
+
+**WORKLOG entry 작성 시 준수사항**: 매 `[DEV]`/`[RESEARCH]`/`[DECISION]` entry를 쓸 때 learn-from-friction Rule 1.1에 따라 "여기서 뽑을 LEARNING 후보 있나?"를 자기 점검한다. 품질 게이트 4문항 중 2개 이상 YES면 `docs/progress/LEARNINGS.md` 상단에 draft로 append하고 WORKLOG entry의 Details에 링크한다.
 
 ## Current Product Boundary
 

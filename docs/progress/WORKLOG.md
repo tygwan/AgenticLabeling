@@ -20,14 +20,71 @@
 - **What**: 무엇을 했는지 2-3줄
 - **Why**: 동기. 무엇이 궁금했거나 무엇이 막혔었는지
 - **Result / Found / Decision**: 핵심 산출물·관찰·결정
-- **Details**: 자세한 자료·코드·리포트 링크
+- **Details**: 자세한 자료·코드·리포트 링크 (+ Related LEARNING 링크가 있으면 포함)
 
 상세 리포트는 `docs/` 또는 `research/observations/` 아래에 두고, WORKLOG에는 링크만 남긴다.
 
+**LEARNING 후보 자기 점검 (의무)**: 각 entry를 쓸 때 [learn-from-friction.md](../standards/learn-from-friction.md) Rule 1.1·Rule 2에 따라 "이 작업에서 뽑을 general 원칙이 있나?"를 자기 점검한다. 4문항 게이트 중 2개 이상 YES면 [LEARNINGS.md](LEARNINGS.md) 상단에 draft로 append하고 여기 Details에 링크한다. 애매하면 기록하지 말라 — noise는 가치를 죽인다.
+
 상세 프로토콜·규칙은:
 
+- [docs/standards/learn-from-friction.md](../standards/learn-from-friction.md) — 마찰 → 일반 원칙 루프
 - [docs/standards/research-observation-protocol.md](../standards/research-observation-protocol.md)
 - [docs/standards/model-inspection-conventions.md](../standards/model-inspection-conventions.md)
+
+---
+
+## 2026-04-21
+
+### [DEV] Learn-from-Friction 표준 + LEARNINGS 버퍼 도입
+
+**What**: `docs/standards/learn-from-friction.md` 신설 — 마찰 이벤트(실패·설계·반복·관찰)를 draft → validated → promoted 생애주기로 누적해 일반 원칙으로 승격하는 메타 루프를 표준화. 자동 hook은 **쓰지 않는다**(signal↔noise 비율이 나쁘고 역량 증명용 log가 못 됨). 대신 세 분기점에서만 기록: (1) WORKLOG entry 작성 시점, (2) 디버깅 직후, (3) 사용자 명시 지시. 품질 게이트 4문항(일반화 가능 / 비자명 / 해결 사고 필요 / 명령형 진술 가능) 중 2개 이상 YES라야 기록. `docs/progress/LEARNINGS.md` 신설, 오늘 게이트 통과한 6개 원칙을 seed로 등록: library version upper-bound, test at API contract layer, fail-fast type/shape cast, bit-exact raw comparison, external instrumentation hooks, idempotent additive schema evolution. CLAUDE.md / AGENTS.md / docs/agents/START-HERE.md 읽기 순서·의무 조항 업데이트. WORKLOG preamble에 "LEARNING 후보 자기 점검 (의무)" 추가. research-observation-protocol.md Rule 8에 observation을 LEARNING 발견 분기점으로 연결.
+
+**Why**: 지금까지 발견한 G-U 규칙들을 회고해보니 모두 **"마찰 이벤트"**(런타임 에러·환경 실패·테스트 리팩토링·설계 회고·관찰 불일치)에서 나왔고, 기존 top-down dev-standards 문서(adoption-model 등)로는 그 규칙들을 사전 추론할 수 없었다. 즉 프로그래밍 규칙은 bottom-up으로 발견되고 검증되어야 한다. 이걸 시스템화하지 않으면 규칙이 세션마다 휘발하고 포트폴리오 자산이 못 된다. 자동 hook은 역량 증명에 어울리지 않음이 명확해 배제.
+
+**Result**:
+- 신규 standard 1개 (`learn-from-friction.md`), 신규 progress 버퍼 1개 (`LEARNINGS.md` + 6 seed), 읽기 진입점 4개 업데이트
+- 오늘 이후 모든 WORKLOG entry 작성은 LEARNING 체크 루틴과 함께 수행
+- 향후 LEARNINGS의 validated → promoted 과정이 `docs/standards/` 성장의 주 경로
+
+**Related LEARNING**: 이 entry 자체가 "규칙은 bottom-up으로 발견된다"는 메타 원칙의 결과물. 해당 원칙은 learn-from-friction.md의 `Why this exists` 섹션에 녹아 있으므로 LEARNINGS에 별도 draft로 뽑지는 않는다 (이미 standard로 승격된 상태).
+
+**Triggered by**: 2026-04-20 UI 전체 구현 entry 이후 사용자 질문 — "이 프로젝트에 새로 추가된 규칙이 무엇이고 general한 것은 dev-standards로 올릴 수 있는가?"
+**Triggers**: 향후 모든 WORKLOG entry 작성 루틴 + LEARNINGS 검증 주기 (2주마다) + promoted 원칙이 쌓이면 `docs/standards/general-engineering-practices.md` 신설 검토
+
+---
+
+### [DEV] Wave A.1 — Run 엔티티 (DB + API + Home 실데이터)
+
+**What**: `mvp_app/storage.py` SCHEMA_SQL에 `runs` 테이블 추가(run_id, project_id, source_id, status, source_count, classes, detection_backend, segmentation_backend, detections, started_at, finished_at, duration_ms, error). `registry.start_run / finish_run / list_runs` 메서드 추가. `/api/pipeline/auto-label`이 run을 생성하고 성공/실패 시 `finish_run` 호출(duration_ms 자동 계산). 신규 `GET /api/runs` 엔드포인트. `/api/review/workspace` 응답에 `recent_runs` 포함. `mvp_app/static/components/home.jsx`의 RECENT_RUNS mock 제거 후 `workspace.recent_runs` 실데이터로 교체.
+
+**Why**: UI 이식 후 Home 화면의 Recent runs가 유일하게 mock에 남아 있어 실제 사용자 가치가 없었음. Run 엔티티 자체가 MVP Refactor Plan Phase 3 (Batch Curation)의 선행 조건이고, 사용자가 승인한 Wave A.1.
+
+**Result**: smoke test로 run 생성·완료·listing 확인(duration_ms=886ms 측정), workspace endpoint에 recent_runs가 들어옴. 202 tests pass 유지.
+
+**Details**: 변경 파일 `mvp_app/storage.py`, `mvp_app/registry.py`, `mvp_app/main.py`, `mvp_app/static/components/home.jsx`.
+
+**Related LEARNING**: [스키마 변경은 idempotent + 덧붙임(additive)만으로 한다](LEARNINGS.md) — 기존 DB에 `CREATE TABLE IF NOT EXISTS`만으로 migration 수행.
+
+**Triggered by**: 2026-04-20 UI 구현 entry (UI가 드러낸 백엔드 gap 리스트)
+**Triggers**: Wave A.2 (Export splits), Wave B.1 (source.error 는 runs 테이블과 동일 패턴)
+
+---
+
+### [DEV] Wave A.2 — Export splits (API + 분할 로직)
+
+**What**: `registry.export_dataset` 가 `split_ratios={'train','val','test'}` 인자를 받고, `_split_sources`가 percent/fraction 둘 다 허용하며 정규화해 index-based split 수행. `/api/export` 가 `split_train/split_val/split_test` Form 필드 받아 전달. `mvp_app/static/components/api.jsx` `exportDataset`가 splits 전송. `ExportScreen`이 UI slider 값을 그대로 보냄.
+
+**Why**: reference의 Export 화면에 splits slider가 있었으나 backend 미지원이라 disabled UI. 실제 dataset curation의 핵심 기능이고 Frontend Requirements Response의 "Dataset curation and export" 시나리오에 직접 해당.
+
+**Result**: 202 tests pass 유지. UI→API→registry 경로 배선 완료, 임의 split 비율로 export 가능.
+
+**Details**: 변경 파일 `mvp_app/registry.py`, `mvp_app/main.py`, `mvp_app/static/components/api.jsx`, `mvp_app/static/components/screens.jsx`.
+
+**Related LEARNING**: 없음 (이 변경 자체는 feature wiring, 뽑을 general 원칙 없음. noise 방지를 위해 기록 안 함).
+
+**Triggered by**: 위 Wave A.1 완료
+**Triggers**: Wave B.1 (source.error 필드)
 
 ---
 
